@@ -1,0 +1,288 @@
+/* ==========================================================================
+   Matriz de Riscos 3x3 e Riscos Mapeados (DIST/DSV)
+   ========================================================================== */
+
+/* Metodologia Explicativa */
+.methodology-box {
+  background: var(--bg-hover-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.methodology-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.methodology-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border-radius: var(--radius-button);
+  border: 1px solid var(--border-color);
+}
+
+.methodology-indicator {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.indicator-baixo { background-color: var(--color-success); }
+.indicator-moderado { background-color: var(--color-warning); }
+.indicator-alto { background-color: var(--color-danger); }
+
+/* Matriz 3x3 Layout */
+.matrix-container {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  gap: 14px;
+  background: #ffffff;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 28px;
+}
+
+.matrix-y-axis-label {
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  text-align: center;
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.matrix-content-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.matrix-grid-3x3 {
+  display: grid;
+  grid-template-columns: 80px repeat(3, 1fr);
+  grid-template-rows: repeat(3, minmax(110px, auto)) 40px;
+  gap: 8px;
+}
+
+/* Rótulos dos eixos da Matriz */
+.axis-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.axis-col-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.axis-corner-empty {
+  /* Canto inferior esquerdo vazio */
+}
+
+/* Células da Matriz */
+.matrix-cell {
+  border-radius: var(--radius-card);
+  padding: 10px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  min-height: 110px;
+  transition: var(--transition-fast);
+}
+
+.matrix-cell:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Cores das Células da Matriz de acordo com o score */
+.matrix-cell.cell-baixo {
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.matrix-cell.cell-moderado {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+}
+
+.matrix-cell.cell-alto {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+}
+
+.matrix-cell-score {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  opacity: 0.55;
+  color: var(--text-main);
+}
+
+.matrix-cell-label {
+  font-size: 10.5px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.cell-baixo .matrix-cell-label { color: var(--color-success); }
+.cell-moderado .matrix-cell-label { color: var(--color-warning); }
+.cell-alto .matrix-cell-label { color: var(--color-danger); }
+
+/* Chips de Riscos posicionados na célula */
+.matrix-chips-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-content: flex-start;
+  margin-top: auto;
+}
+
+.risk-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-badge);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  background-color: #ffffff;
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  user-select: none;
+}
+
+.risk-chip:hover, .risk-chip:focus {
+  transform: scale(1.08);
+  box-shadow: var(--shadow-popover);
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.risk-chip.chip-baixo {
+  border-left: 3px solid var(--color-success);
+}
+
+.risk-chip.chip-moderado {
+  border-left: 3px solid var(--color-warning);
+}
+
+.risk-chip.chip-alto {
+  border-left: 3px solid var(--color-danger);
+}
+
+/* Botão "Ver mais" quando há muitos riscos na mesma célula */
+.risk-chip-more {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  padding: 4px 6px;
+  border-radius: var(--radius-badge);
+  cursor: pointer;
+  border: 1px dashed var(--border-color);
+}
+
+/* Lista de Riscos Mapeados */
+.risks-list-card {
+  margin-top: 24px;
+}
+
+.risk-table-item-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Risco em Destaque no Modal */
+.risk-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.risk-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.risk-detail-label {
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.risk-detail-value {
+  font-size: 13.5px;
+  color: var(--text-main);
+  font-weight: var(--font-weight-medium);
+}
+
+@media (max-width: 768px) {
+  .matrix-container {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .matrix-y-axis-label {
+    writing-mode: horizontal-tb;
+    transform: none;
+    text-align: left;
+    margin-bottom: 8px;
+  }
+
+  .matrix-grid-3x3 {
+    grid-template-columns: 60px repeat(3, minmax(70px, 1fr));
+  }
+
+  .matrix-cell {
+    min-height: 90px;
+    padding: 6px;
+  }
+
+  .risk-chip {
+    padding: 2px 5px;
+    font-size: 10px;
+  }
+}

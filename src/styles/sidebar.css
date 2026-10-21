@@ -1,0 +1,288 @@
+/* ==========================================================================
+   Sidebar & Navegação Lateral (Design System DSV)
+   ========================================================================== */
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width-expanded);
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  z-index: 100;
+  transition: var(--transition-smooth);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.app-layout.sidebar-collapsed .sidebar {
+  width: var(--sidebar-width-collapsed);
+  padding: 24px 10px;
+}
+
+/* Header da Sidebar com Logo e Botão de Colapsar */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 20px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-color-light);
+  gap: 8px;
+}
+
+.app-layout.sidebar-collapsed .sidebar-header {
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 16px;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.app-layout.sidebar-collapsed .sidebar-brand {
+  justify-content: center;
+  width: 100%;
+}
+
+.sidebar-brand-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+}
+
+.sidebar-logo-expanded {
+  height: 34px;
+  width: auto;
+  max-width: 170px;
+  object-fit: contain;
+  display: block;
+  transition: var(--transition-fast);
+}
+
+.sidebar-logo-collapsed {
+  height: 34px;
+  width: auto;
+  max-width: 36px;
+  object-fit: contain;
+  display: none;
+  transition: var(--transition-fast);
+}
+
+.app-layout.sidebar-collapsed .sidebar-logo-expanded {
+  display: none;
+}
+
+.app-layout.sidebar-collapsed .sidebar-logo-collapsed {
+  display: block;
+}
+
+.btn-toggle-sidebar {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-button);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.app-layout.sidebar-collapsed .btn-toggle-sidebar {
+  margin: 0 auto;
+}
+
+.btn-toggle-sidebar:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+/* Lista de Navegação por Abas */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  flex: 1;
+}
+
+.nav-section-title {
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 12px 14px 6px;
+  margin-top: 10px;
+}
+
+.app-layout.sidebar-collapsed .nav-section-title {
+  display: none;
+}
+
+.nav-tab-item {
+  width: 100%;
+}
+
+.nav-tab-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-card);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: var(--font-size-menu);
+  font-weight: var(--font-weight-medium);
+  transition: var(--transition-fast);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.nav-tab-link .material-symbols-outlined {
+  font-size: 20px;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+}
+
+.nav-tab-link:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.nav-tab-link.active {
+  background-color: var(--color-primary);
+  color: var(--text-inverse);
+  font-weight: var(--font-weight-bold);
+  box-shadow: var(--shadow-tab-active);
+}
+
+.nav-tab-link.active .material-symbols-outlined {
+  color: var(--text-inverse);
+}
+
+.nav-tab-link.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: auto; /* Permite exibir tooltip ou aviso explicativo */
+}
+
+.app-layout.sidebar-collapsed .nav-tab-label {
+  display: none;
+}
+
+.nav-tab-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  padding: 2px 7px;
+  border-radius: var(--radius-badge);
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.nav-tab-link.active .nav-tab-badge {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: var(--text-inverse);
+}
+
+.app-layout.sidebar-collapsed .nav-tab-badge {
+  display: none;
+}
+
+/* Footer da Sidebar com Status do Módulo DIST */
+.sidebar-footer {
+  padding-top: 16px;
+  margin-top: auto;
+  border-top: 1px solid var(--border-color-light);
+}
+
+.dist-module-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-button);
+  font-size: 11.5px;
+  font-weight: var(--font-weight-semibold);
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.dist-module-pill.active {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.dist-module-pill.inactive {
+  background-color: var(--color-neutral-bg);
+  color: var(--text-muted);
+}
+
+.dist-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.app-layout.sidebar-collapsed .dist-module-pill span:not(.dist-indicator-dot) {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    position: static;
+    width: 100% !important;
+    height: auto;
+    padding: 12px 20px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .sidebar-header {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    flex: 1;
+  }
+
+  .btn-toggle-sidebar {
+    display: none;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    width: 100%;
+    margin-top: 12px;
+    padding-bottom: 4px;
+  }
+
+  .sidebar-footer {
+    display: none;
+  }
+}
