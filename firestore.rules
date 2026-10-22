@@ -1,0 +1,166 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // FUNÇÕES AUXILIARES DE AUTENTICAÇÃO E PERFIS POR PAINEL
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function userExists() {
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    // Superadministrador (acesso irrestrito a todos os painéis)
+    function isAdminGeral() {
+      return isAuthenticated() && userExists() && (
+        getUserData().get('admin_geral', false) == true ||
+        getUserData().get('role', '') == 'admin' ||
+        getUserData().get('papel', '') == 'admin' ||
+        request.auth.token.get('admin', false) == true
+      );
+    }
+
+    // --- ROLES ESPECÍFICAS DE CADA PAINEL ---
+
+    // 1. Painel Projetos (DIST)
+    function getRoleProjetos() {
+      return userExists() ? getUserData().get('role_projetos', null) : null;
+    }
+    function canReadProjetos() {
+      return isAdminGeral() || getRoleProjetos() in ['admin', 'editor', 'leitor'];
+    }
+    function canWriteProjetos() {
+      return isAdminGeral() || getRoleProjetos() in ['admin', 'editor'];
+    }
+    function isAdminProjetos() {
+      return isAdminGeral() || getRoleProjetos() == 'admin';
+    }
+
+    // 2. Painel CRM / RSV (Contatos e Entidades)
+    // Mantém total retrocompatibilidade lendo 'role' (ou 'papel') se 'role_crm' não existir
+    function getRoleCRM() {
+      return userExists() 
+        ? getUserData().get('role_crm', getUserData().get('role', getUserData().get('papel', null))) 
+        : null;
+    }
+    function canReadCRM() {
+      return isAdminGeral() || getRoleCRM() in ['admin', 'revisor', 'editor', 'cadastro', 'leitor'];
+    }
+    function canWriteCRM() {
+      return isAdminGeral() || getRoleCRM() in ['admin', 'revisor', 'editor', 'cadastro'];
+    }
+
+    // 3. Painel Convites & Eventos
+    function getRoleEventos() {
+      return userExists() ? getUserData().get('role_eventos', null) : null;
+    }
+    function canReadEventos() {
+      return isAdminGeral() || getRoleEventos() in ['admin', 'editor', 'leitor'];
+    }
+    function canWriteEventos() {
+      return isAdminGeral() || getRoleEventos() in ['admin', 'editor'];
+    }
+
+    // =========================================================================
+    // USUÁRIOS E GESTÃO DE ACESSOS (/usuarios)
+    // =========================================================================
+    match /usuarios/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (request.auth.uid == userId || isAdminGeral());
+      allow delete: if isAdminGeral();
+    }
+
+    // =========================================================================
+    // MÓDULO 1: BASE CENTRAL CRM / RSV
+    // =========================================================================
+    match /contatos/{contatoId} {
+      allow read: if isAuthenticated() && canReadCRM();
+      allow create, update: if isAuthenticated() && canWriteCRM();
+      allow delete: if isAdminGeral() || getRoleCRM() in ['admin', 'revisor'];
+    }
+
+    match /entidades/{entidadeId} {
+      allow read: if isAuthenticated() && canReadCRM();
+      allow write: if isAuthenticated() && canWriteCRM();
+    }
+
+    match /municipios/{municipioId} {
+      allow read: if isAuthenticated() && canReadCRM();
+      allow write: if isAdminGeral();
+    }
+
+    match /interacoes/{interacaoId} {
+      allow read: if isAuthenticated() && canReadCRM();
+      allow write: if isAuthenticated() && canWriteCRM();
+    }
+
+    match /presencas/{presencaId} {
+      allow read: if isAuthenticated() && canReadCRM();
+      allow write: if isAuthenticated() && canWriteCRM();
+    }
+
+    // =========================================================================
+    // MÓDULO 2: GESTÃO DE PROJETOS INTERINSTITUCIONAIS (DIST)
+    // =========================================================================
+    match /projetos/{projetoId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow create, update: if isAuthenticated() && canWriteProjetos();
+      allow delete: if isAdminProjetos();
+    }
+
+    match /riscos/{riscoId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow write: if isAuthenticated() && canWriteProjetos();
+    }
+
+    match /riscos_projeto/{riscoId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow write: if isAuthenticated() && canWriteProjetos();
+    }
+
+    match /diagnosticos/{diagnosticoId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow write: if isAuthenticated() && canWriteProjetos();
+    }
+
+    match /historico/{logId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow create: if isAuthenticated() && canWriteProjetos();
+      allow update, delete: if false; // Auditoria imutável
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow create: if isAuthenticated() && canWriteProjetos();
+      allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // MÓDULO 3: GESTÃO DE CONVITES & EVENTOS
+    // =========================================================================
+    match /convites/{conviteId} {
+      allow read: if isAuthenticated() && canReadEventos();
+      allow write: if isAuthenticated() && canWriteEventos();
+    }
+
+    match /eventos/{eventoId} {
+      allow read: if isAuthenticated() && canReadEventos();
+      allow write: if isAuthenticated() && canWriteEventos();
+    }
+
+    // =========================================================================
+    // BLOQUEIO GERAL
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

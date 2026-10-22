@@ -1,38 +1,10 @@
 /**
  * Componente do Header Superior
- * Contexto de Projeto Ativo persistente e Seletor de Perfil do Usuário
+ * Contexto de Projeto Ativo persistente
  */
-import { getState, setActiveProject, setCurrentUser, subscribe } from '../store/state.js';
+import { getState, setActiveProject, subscribe } from '../store/state.js';
 import { ProjetosService } from '../services/projetos.service.js';
 import { guardedNavigate } from './dirty-guard.js';
-
-// Perfis disponíveis para demonstração das regras de acesso
-const USUARIOS_DEMO = [
-  {
-    uid: 'usr_01_dist_gestor',
-    nome: 'Carlos Silva (DIST)',
-    email: 'carlos.silva@detran.sp.gov.br',
-    perfil: 'gestor_dist' // Pode configurar módulo DIST e tudo
-  },
-  {
-    uid: 'usr_02_admin',
-    nome: 'Administrador do Sistema',
-    email: 'admin@detran.sp.gov.br',
-    perfil: 'admin' // Acesso total
-  },
-  {
-    uid: 'usr_03_editor',
-    nome: 'Mariana Costa (DSV)',
-    email: 'mariana.costa@detran.sp.gov.br',
-    perfil: 'editor' // Edita projetos/riscos, mas NÃO altera flag DIST
-  },
-  {
-    uid: 'usr_04_leitor',
-    nome: 'Consulta Somente Leitura',
-    email: 'leitor@detran.sp.gov.br',
-    perfil: 'leitor' // Apenas visualiza
-  }
-];
 
 export async function renderHeader() {
   const container = document.getElementById('header-container');
@@ -84,21 +56,6 @@ export async function renderHeader() {
             </span>
           ` : ''}
         </div>
-
-        <!-- Perfil do Usuário e Seletor de Simulação de Papel -->
-        <div class="user-profile-badge">
-          <span class="material-symbols-outlined" style="color: var(--text-secondary); font-size: 20px;">account_circle</span>
-          <div style="display: flex; flex-direction: column; text-align: left;">
-            <select id="select-user-role" style="border: none; background: transparent; font-weight: var(--font-weight-semibold); font-size: 12px; color: var(--text-main); cursor: pointer; outline: none;" aria-label="Simular usuário e perfil">
-              ${USUARIOS_DEMO.map(u => `
-                <option value="${u.uid}" ${u.uid === currentUser?.uid ? 'selected' : ''}>
-                  ${u.nome} (${u.perfil.toUpperCase()})
-                </option>
-              `).join('')}
-            </select>
-          </div>
-          <span class="role-tag">${currentUser?.perfil}</span>
-        </div>
       </div>
     `;
 
@@ -115,18 +72,6 @@ export async function renderHeader() {
             setActiveProject(proj);
           }
         });
-      });
-    }
-
-    // Listener Troca de Usuário/Perfil
-    const userSelect = container.querySelector('#select-user-role');
-    if (userSelect) {
-      userSelect.addEventListener('change', (e) => {
-        const selectedUid = e.target.value;
-        const userObj = USUARIOS_DEMO.find(u => u.uid === selectedUid);
-        if (userObj) {
-          setCurrentUser(userObj);
-        }
       });
     }
   };

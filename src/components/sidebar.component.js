@@ -3,17 +3,26 @@
  * Seguindo fielmente o Design System DSV
  */
 import { getState, setActiveTab, toggleSidebar, subscribe } from '../store/state.js';
+import { AuthService } from '../services/auth.service.js';
 import { guardedNavigate } from './dirty-guard.js';
 import logoHorizontal from '../../data/refs/logo_horizontal.png';
 import logoDetran from '../../data/refs/logo_detran.png';
+
+function getInitials(name) {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export function renderSidebar() {
   const container = document.getElementById('sidebar-container');
   if (!container) return;
 
   const update = () => {
-    const { activeTab, activeProject, sidebarCollapsed } = getState();
+    const { activeTab, activeProject, sidebarCollapsed, currentUser } = getState();
     const distAtivo = activeProject ? !!activeProject.distHabilitado : null;
+    const initials = currentUser ? getInitials(currentUser.nome) : '';
 
     container.innerHTML = `
       <div class="sidebar-header">
@@ -91,6 +100,22 @@ export function renderSidebar() {
           <span class="dist-indicator-dot"></span>
           <span>${distAtivo === true ? 'DIST Habilitado' : (activeProject ? 'DIST Não Habilitado' : 'Sem Projeto Ativo')}</span>
         </div>
+
+        ${currentUser ? `
+          <div id="userProfileSidebar" class="user-profile-sidebar" title="${currentUser.nome} (${(currentUser.perfil || '').toUpperCase()})">
+            <div class="user-profile-info">
+              <div class="user-avatar" title="${currentUser.nome}">
+                ${initials}
+              </div>
+              <div class="user-name-text">
+                ${currentUser.nome}
+              </div>
+            </div>
+            <button type="button" id="sidebarLogoutBtn" class="btn-sidebar-logout" title="Sair da Conta" aria-label="Sair da Conta">
+              <span class="material-symbols-outlined">logout</span>
+            </button>
+          </div>
+        ` : ''}
       </div>
     `;
 
@@ -118,12 +143,22 @@ export function renderSidebar() {
         guardedNavigate(() => setActiveTab('dashboard'));
       });
     }
+
+    const logoutBtn = container.querySelector('#sidebarLogoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        guardedNavigate(async () => {
+          await AuthService.logout();
+        });
+      });
+    }
   };
 
   update();
 
   subscribe('tabChange', update);
   subscribe('projectChange', update);
+  subscribe('userChange', update);
   subscribe('sidebarChange', () => {
     const { sidebarCollapsed } = getState();
     const app = document.getElementById('app');

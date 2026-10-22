@@ -1,6 +1,7 @@
 /**
  * Serviço de Pontos Focais e Contatos
  * Conforme Seção 4 do documento de regras de negócio
+ * Integrado à Base Central /contatos (painel-rsv)
  */
 import { StorageAdapter } from './storage-adapter.js';
 import { AuditService } from './audit.service.js';
@@ -19,6 +20,15 @@ export const ContatosService = {
   validarEmail(email) {
     if (!email || typeof email !== 'string') return false;
     return EMAIL_REGEX.test(email.trim());
+  },
+
+  /**
+   * Lista todos os contatos da Base Central /contatos
+   * @returns {Promise<Array>}
+   */
+  async listarTodos() {
+    const contatos = await StorageAdapter.getAll(COLLECTION);
+    return contatos.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
   },
 
   /**
@@ -43,7 +53,7 @@ export const ContatosService = {
   },
 
   /**
-   * Cadastra ou atualiza um contato vinculado a um projeto
+   * Cadastra ou atualiza um contato vinculado a um projeto na Base Central
    * @param {Object} dadosContato 
    * @param {Object} usuario 
    * @returns {Promise<Object>}
