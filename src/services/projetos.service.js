@@ -8,6 +8,27 @@ import { canConfigureDist } from '../store/state.js';
 
 const COLLECTION = 'projetos';
 
+/**
+ * Normaliza campos de projetos vindos do Firestore
+ * Garante compatibilidade bidirecional entre 'nome' e 'nome_projeto'
+ */
+export function normalizarProjeto(p) {
+  if (!p) return null;
+  const nome = p.nome || p.nome_projeto || p.titulo || 'Projeto sem nome';
+  const descricao = p.descricao || p.descricao_projeto || '';
+  const sigla = p.sigla || p.sigla_projeto || '';
+  return {
+    ...p,
+    nome,
+    nome_projeto: p.nome_projeto || nome,
+    descricao,
+    descricao_projeto: p.descricao_projeto || descricao,
+    sigla,
+    sigla_projeto: p.sigla_projeto || sigla,
+    distHabilitado: p.distHabilitado !== undefined ? !!p.distHabilitado : true
+  };
+}
+
 export const ProjetosService = {
   /**
    * Valida coerência de datas do projeto
@@ -30,7 +51,9 @@ export const ProjetosService = {
    */
   async listarProjetos() {
     const projetos = await StorageAdapter.getAll(COLLECTION);
-    return projetos.sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''));
+    return projetos
+      .map(normalizarProjeto)
+      .sort((a, b) => (b.atualizadoEm || '').localeCompare(a.atualizadoEm || ''));
   },
 
   /**
@@ -40,7 +63,8 @@ export const ProjetosService = {
    */
   async obterPorId(id) {
     if (!id) return null;
-    return await StorageAdapter.getById(COLLECTION, id);
+    const proj = await StorageAdapter.getById(COLLECTION, id);
+    return normalizarProjeto(proj);
   },
 
   /**
@@ -50,7 +74,8 @@ export const ProjetosService = {
    * @returns {Promise<Object>}
    */
   async salvarProjeto(dadosProjeto, usuario) {
-    if (!dadosProjeto.nome || !dadosProjeto.nome.trim()) {
+    const nome = (dadosProjeto.nome || dadosProjeto.nome_projeto || '').trim();
+    if (!nome) {
       throw new Error('O nome do projeto é obrigatório.');
     }
 
@@ -68,11 +93,15 @@ export const ProjetosService = {
       }
     }
 
+    const descricao = (dadosProjeto.descricao || dadosProjeto.descricao_projeto || '').trim();
+
     const payload = {
       ...dadosProjeto,
-      nome: dadosProjeto.nome.trim(),
-      descricao: dadosProjeto.descricao?.trim() || '',
-      distHabilitado: !!distHabilitado,
+      nome,
+      nome_projeto: nome,
+      descricao,
+      descricao_projeto: descricao,
+      distHabilitado: distHabilitado !== undefined ? !!distHabilitado : true,
       atualizadoEm: now,
       atualizadoPor: {
         uid: usuario?.uid || 'anonimo',

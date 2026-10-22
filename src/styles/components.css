@@ -975,3 +975,525 @@
   text-align: left;
   line-height: 1.4;
 }
+
+/* ==========================================================================
+   Indicador de Projeto Ativo no Cabeçalho Superior
+   ========================================================================== */
+.header-project-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--bg-hover, #f8fafc);
+  padding: 6px 14px;
+  border-radius: var(--radius-card, 8px);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.header-project-indicator.header-project-empty {
+  border-style: dashed;
+  background-color: transparent;
+}
+
+.header-project-icon {
+  font-size: 18px;
+  color: var(--color-primary, #0056b3);
+}
+
+.header-project-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   Project Context Card (Banner Unificado do Módulo DIST)
+   ========================================================================== */
+.project-context-card {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-card, 8px);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.project-context-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color-light, #f1f5f9);
+}
+
+.project-context-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.project-context-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: var(--color-primary, #0056b3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.project-context-icon .material-symbols-outlined {
+  font-size: 24px;
+}
+
+.project-context-pretitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.project-context-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-main, #0f172a);
+  margin: 2px 0 0 0;
+  line-height: 1.25;
+}
+
+.project-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.project-context-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.project-context-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.project-context-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--bg-hover, #f8fafc);
+  color: var(--color-primary, #0056b3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.project-context-item-icon .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.project-context-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.project-context-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.project-context-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-context-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.project-meta-chip {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.project-context-empty {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  font-style: italic;
+}
+
+/* ==========================================================================
+   Multiselect Dropdown Reutilizável
+   ========================================================================== */
+.multiselect-component {
+  position: relative;
+  width: 100%;
+}
+
+.multiselect-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: #ffffff;
+  border-radius: var(--radius-button, 6px);
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--text-main, #0f172a);
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.multiselect-trigger:hover {
+  border-color: var(--color-primary-light, #93c5fd);
+  background: #fbfdff;
+}
+
+.multiselect-trigger:focus-visible,
+.multiselect-trigger[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--color-primary, #0056b3);
+  box-shadow: 0 0 0 2px rgba(0, 86, 179, 0.15);
+}
+
+.multiselect-trigger-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.multiselect-trigger-icon {
+  font-size: 18px;
+  color: var(--text-muted, #64748b);
+  flex-shrink: 0;
+}
+
+.multiselect-trigger-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.multiselect-trigger-text.is-placeholder {
+  color: var(--text-muted, #94a3b8);
+  font-weight: normal;
+}
+
+.multiselect-count-badge {
+  background: var(--color-primary, #0056b3);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 7px;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.multiselect-chevron {
+  font-size: 20px;
+  color: var(--text-muted, #64748b);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.multiselect-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.multiselect-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 150;
+  background: #ffffff;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 10px;
+}
+
+.multiselect-header {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color-light, #f1f5f9);
+}
+
+.multiselect-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-hover, #f8fafc);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.multiselect-search-input {
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  width: 100%;
+  outline: none;
+  color: var(--text-main, #0f172a);
+}
+
+.multiselect-search-clear {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted, #94a3b8);
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.multiselect-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.multiselect-action-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-primary, #0056b3);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.multiselect-action-btn:hover {
+  text-decoration: underline;
+}
+
+.multiselect-options-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 6px;
+}
+
+.multiselect-option-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-main, #0f172a);
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.multiselect-option-item:hover {
+  background-color: var(--bg-hover, #f1f5f9);
+}
+
+.multiselect-option-item.is-selected {
+  background-color: #eff6ff;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.multiselect-checkbox {
+  cursor: pointer;
+  accent-color: var(--color-primary, #0056b3);
+  width: 15px;
+  height: 15px;
+}
+
+.multiselect-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.multiselect-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.multiselect-tag-text {
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.multiselect-tag-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #0284c7;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin-left: 2px;
+}
+
+.multiselect-tag-remove:hover {
+  color: #b91c1c;
+}
+
+.multiselect-tag-remove .material-symbols-outlined {
+  font-size: 13px;
+}
+
+.multiselect-tags-more {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--text-muted, #64748b);
+  padding: 3px 6px;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+/* ==========================================================================
+   Cards de Contato Institucionais (Visão Geral Clean)
+   ========================================================================== */
+.contact-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.contact-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.contact-card:hover {
+  border-color: var(--color-primary-light, #93c5fd);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.contact-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.contact-card-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.contact-card-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #334155;
+  font-weight: 700;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.contact-card-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-main, #0f172a);
+}
+
+.contact-card-role {
+  font-size: 11.5px;
+  color: var(--text-muted, #64748b);
+}
+
+.contact-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, #475569);
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color-light, #f1f5f9);
+}
+
+.contact-card-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.contact-card-row .material-symbols-outlined {
+  font-size: 15px;
+  color: var(--text-muted, #64748b);
+}
+
+.contact-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+

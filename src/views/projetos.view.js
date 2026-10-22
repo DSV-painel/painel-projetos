@@ -8,6 +8,7 @@ import { openModal, closeModal } from '../components/modal.component.js';
 import { showToast } from '../components/toast.component.js';
 import { getAreasInstitucionais } from '../config/areas-institucionais.js';
 import { guardedNavigate } from '../components/dirty-guard.js';
+import { renderMultiselectDropdown } from '../components/multiselect-dropdown.component.js';
 
 export async function renderProjetos(container) {
   container.innerHTML = `
@@ -299,18 +300,9 @@ export async function renderProjetos(container) {
         </div>
 
         <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label">Áreas Detran Envolvidas (Lista Institucional)</label>
-          <div class="chips-container" id="form-chips-areas">
-            ${areasDisponiveis.map(area => {
-              const checked = selectedAreas.includes(area);
-              return `
-                <button type="button" class="chip-selectable ${checked ? 'selected' : ''}" data-area="${area}">
-                  <span class="material-symbols-outlined" style="font-size: 14px;">${checked ? 'check' : 'add'}</span>
-                  <span>${area}</span>
-                </button>
-              `;
-            }).join('')}
-          </div>
+          <label class="form-label">Áreas Detran Envolvidas</label>
+          <div id="form-modal-multiselect-areas"></div>
+          <span class="form-hint">Selecione uma ou mais diretorias ou divisões institucionais do Detran.SP.</span>
         </div>
 
         <div class="form-group" style="margin-bottom: 0;">
@@ -353,14 +345,17 @@ export async function renderProjetos(container) {
       maxWidth: '680px'
     });
 
-    // Chips selection
-    modal.querySelectorAll('#form-chips-areas .chip-selectable').forEach(chip => {
-      chip.addEventListener('click', () => {
-        chip.classList.toggle('selected');
-        const icon = chip.querySelector('.material-symbols-outlined');
-        icon.textContent = chip.classList.contains('selected') ? 'check' : 'add';
-      });
-    });
+    // Dropdown Multiselect de Áreas Detran Envolvidas
+    const multiselectAreas = renderMultiselectDropdown(
+      modal.querySelector('#form-modal-multiselect-areas'),
+      {
+        id: 'modal-areas-multiselect',
+        options: areasDisponiveis,
+        selectedValues: selectedAreas,
+        placeholder: 'Selecione as áreas Detran envolvidas...',
+        searchPlaceholder: 'Buscar diretoria ou divisão...'
+      }
+    );
 
     modal.querySelector('#btn-cancelar-form').addEventListener('click', closeModal);
 
@@ -377,10 +372,7 @@ export async function renderProjetos(container) {
       const entesRaw = modal.querySelector('#form-entes-externos').value;
       const entesExternos = entesRaw ? entesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-      const areasDetranEnvolvidas = [];
-      modal.querySelectorAll('#form-chips-areas .chip-selectable.selected').forEach(c => {
-        areasDetranEnvolvidas.push(c.getAttribute('data-area'));
-      });
+      const areasDetranEnvolvidas = multiselectAreas ? multiselectAreas.getSelected() : [];
 
       const objetivo = modal.querySelector('#form-objetivo').value.trim();
       const escopo = modal.querySelector('#form-escopo').value.trim();

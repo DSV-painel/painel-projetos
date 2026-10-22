@@ -1,18 +1,15 @@
 /**
  * Componente do Header Superior
- * Contexto de Projeto Ativo persistente
+ * Exibição limpa de título e indicador sutil de projeto ativo
  */
-import { getState, setActiveProject, subscribe } from '../store/state.js';
-import { ProjetosService } from '../services/projetos.service.js';
-import { guardedNavigate } from './dirty-guard.js';
+import { getState, subscribe } from '../store/state.js';
 
 export async function renderHeader() {
   const container = document.getElementById('header-container');
   if (!container) return;
 
-  const update = async () => {
-    const { activeTab, activeProject, activeProjectId, currentUser } = getState();
-    const projetos = await ProjetosService.listarProjetos();
+  const update = () => {
+    const { activeTab, activeProject } = getState();
 
     const titles = {
       dashboard: 'Dashboard Executivo',
@@ -25,6 +22,7 @@ export async function renderHeader() {
     };
 
     const currentTitle = titles[activeTab] || 'Painel de Acompanhamento';
+    const nomeProjeto = activeProject?.nome || activeProject?.nome_projeto || '';
 
     container.innerHTML = `
       <div class="header-left">
@@ -39,44 +37,25 @@ export async function renderHeader() {
       </div>
 
       <div class="header-right">
-        <!-- Seletor de Projeto Ativo -->
-        <div class="project-active-selector" title="Selecione o projeto ativo para filtrar as abas">
-          <span class="material-symbols-outlined" style="color: var(--color-primary); font-size: 18px;">folder</span>
-          <select id="select-active-project" class="project-selector-dropdown" aria-label="Selecione o projeto ativo">
-            <option value="">-- Selecionar Projeto --</option>
-            ${projetos.map(p => `
-              <option value="${p.id}" ${p.id === activeProjectId ? 'selected' : ''}>
-                ${p.nome} ${p.distHabilitado ? '★' : ''}
-              </option>
-            `).join('')}
-          </select>
-          ${activeProject ? `
+        ${activeProject ? `
+          <div class="header-project-indicator" title="Projeto ativo: ${nomeProjeto}">
+            <span class="material-symbols-outlined header-project-icon">folder</span>
+            <span class="header-project-name">${nomeProjeto}</span>
             <span class="badge ${activeProject.distHabilitado ? 'badge-success' : 'badge-neutral'}" style="font-size: 10px; padding: 2px 6px;">
               ${activeProject.distHabilitado ? 'DIST Ativo' : 'DIST Inativo'}
             </span>
-          ` : ''}
-        </div>
+          </div>
+        ` : `
+          <div class="header-project-indicator header-project-empty">
+            <span class="material-symbols-outlined" style="font-size: 16px; color: var(--text-muted);">folder_off</span>
+            <span style="font-size: 12px; color: var(--text-muted);">Nenhum projeto ativo</span>
+          </div>
+        `}
       </div>
     `;
-
-    // Listener Seletor de Projeto
-    const projectSelect = container.querySelector('#select-active-project');
-    if (projectSelect) {
-      projectSelect.addEventListener('change', (e) => {
-        const selectedId = e.target.value;
-        guardedNavigate(async () => {
-          if (!selectedId) {
-            setActiveProject(null);
-          } else {
-            const proj = await ProjetosService.obterPorId(selectedId);
-            setActiveProject(proj);
-          }
-        });
-      });
-    }
   };
 
-  await update();
+  update();
 
   subscribe('tabChange', update);
   subscribe('projectChange', update);
