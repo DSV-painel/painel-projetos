@@ -7,8 +7,19 @@
   background: var(--bg-hover-subtle);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-card);
-  padding: 16px 20px;
+  padding: 14px 18px;
   margin-bottom: 24px;
+  transition: all 0.2s ease;
+}
+
+.methodology-box summary {
+  list-style: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.methodology-box summary::-webkit-details-marker {
+  display: none;
 }
 
 .methodology-grid {

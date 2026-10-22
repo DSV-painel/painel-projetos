@@ -1,15 +1,22 @@
 /**
  * View: Diagnóstico DIST
  * Conforme Seção 5 do documento de regras de negócio:
- * - Bloco "Diagnóstico" (5 classificações oficiais, situação atual, recomendações, áreas executoras)
- * - Bloco "Cadastro de Risco" (título, área incluindo Compartilhada, descrição, P e I de 1 a 3)
+ * - Card de Contexto Unificado do Projeto Ativo
+ * - Classificação técnica do projeto (5 categorias oficiais)
+ * - Situação Atual, Recomendações e Próximos Passos
+ * - Seleção de Áreas Executoras via MultiselectDropdown
+ * - Gestão de Riscos Mapeados com modal rápido de catalogação
  */
-import { getState, setDirty } from '../store/state.js';
+import { getState, setActiveTab, setDirty } from '../store/state.js';
 import { DiagnosticosService, LABELS_CLASSIFICACAO_DIAGNOSTICO } from '../services/diagnosticos.service.js';
 import { ProjetosService } from '../services/projetos.service.js';
 import { RiscosService, calcularClassificacaoRisco } from '../services/riscos.service.js';
 import { showToast } from '../components/toast.component.js';
+import { openModal, closeModal } from '../components/modal.component.js';
 import { getAreasInstitucionais, getAreasRiscos } from '../config/areas-institucionais.js';
+import { renderProjectContextCard, attachProjectContextCardEvents } from '../components/project-context.component.js';
+import { renderMultiselectDropdown } from '../components/multiselect-dropdown.component.js';
+import { guardedNavigate } from '../components/dirty-guard.js';
 
 export async function renderDiagnostico(container) {
   const { activeProject } = getState();
@@ -20,7 +27,7 @@ export async function renderDiagnostico(container) {
         <span class="material-symbols-outlined" style="font-size: 28px;">info</span>
         <div>
           <h3 style="font-size: 15px; margin-bottom: 4px;">Nenhum projeto ativo selecionado</h3>
-          <p style="font-size: 13px;">Selecione um projeto no topo da página ou na aba "Projetos" para registrar ou visualizar o Diagnóstico DIST.</p>
+          <p style="font-size: 13px;">Selecione um projeto na barra lateral ou na aba "Projetos" para registrar ou visualizar o Diagnóstico DIST.</p>
         </div>
       </div>
     `;
@@ -34,7 +41,7 @@ export async function renderDiagnostico(container) {
         <span class="material-symbols-outlined" style="font-size: 48px; color: var(--color-warning); margin-bottom: 12px;">lock</span>
         <h2 class="section-title" style="margin-bottom: 8px;">Módulo DIST Não Habilitado</h2>
         <p style="color: var(--text-secondary); max-width: 560px; margin: 0 auto 20px; line-height: 1.5;">
-          O projeto <strong>"${activeProject.nome}"</strong> está configurado sem o módulo de acompanhamento DIST ativo.
+          O projeto <strong>"${activeProject.nome || activeProject.nome_projeto}"</strong> está configurado sem o módulo de acompanhamento DIST ativo.
           Para habilitar a análise de diagnóstico e matriz de riscos, configure a flag "Utilizar módulo de acompanhamento DIST" na aba de Projetos (requer perfil autorizado).
         </p>
         <span class="badge badge-neutral">Dados históricos preservados no banco de dados</span>
@@ -43,54 +50,42 @@ export async function renderDiagnostico(container) {
     return;
   }
 
-  // Carrega projeto e diagnóstico atual
+  // Carrega projeto, diagnóstico e riscos atuais
   const projeto = await ProjetosService.obterPorId(activeProject.id) || activeProject;
   const diagnostico = await DiagnosticosService.obterPorProjeto(projeto.id);
+  const riscos = await RiscosService.listarPorProjeto(projeto.id);
   const areasInstitucionais = getAreasInstitucionais();
   const areasParaRiscos = getAreasRiscos();
 
   const classificacaoAtual = diagnostico?.classificacao || 'em_andamento';
-  const areasSelecionadas = Array.isArray(diagnostico?.areasResponsaveisExecucao)
-    ? diagnostico.areasResponsaveisExecucao
+  let areasSelecionadas = Array.isArray(diagnostico?.areasResponsaveisExecucao)
+    ? [...diagnostico.areasResponsaveisExecucao]
     : [];
 
-  const entesTexto = Array.isArray(projeto.entesExternos) && projeto.entesExternos.length > 0
-    ? projeto.entesExternos.join(', ')
-    : (projeto.entesExternos || 'Nenhum informado');
-
-  const areasDetranTexto = Array.isArray(projeto.areasDetranEnvolvidas) && projeto.areasDetranEnvolvidas.length > 0
-    ? projeto.areasDetranEnvolvidas.join(', ')
-    : 'Nenhuma selecionada';
-
   container.innerHTML = `
-    <!-- Cabeçalho Limpo e Arejado (Abordagem Clean) -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
-      <div>
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-          <h1 class="page-title">Diagnóstico DIST: ${projeto.nome}</h1>
-          <span class="badge badge-success">Módulo DIST Ativo</span>
-        </div>
-        <p class="subtitle" style="margin-bottom: 8px;">Análise técnica sobre a situação, gargalos, recomendações e catalogação de riscos.</p>
-        <div style="display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--text-muted); flex-wrap: wrap;">
-          <span>Área Gestora: <strong style="color: var(--text-main);">${projeto.areaGestora || 'DSV'}</strong></span>
-          <span>•</span>
-          <span>Entes Externos: <strong style="color: var(--text-main);">${entesTexto}</strong></span>
-          <span>•</span>
-          <span>Responsável Técnico: <strong style="color: var(--text-main);">${diagnostico?.atualizadoPor?.nome || 'Aguardando primeiro registro'}</strong></span>
-          <span>•</span>
-          <span>Última atualização: <strong style="color: var(--text-main);">${diagnostico?.atualizadoEm ? new Date(diagnostico.atualizadoEm).toLocaleDateString('pt-BR') : 'Sem registros'}</strong></span>
-        </div>
-      </div>
-    </div>
+    <!-- Card Unificado de Contexto do Projeto Ativo -->
+    ${renderProjectContextCard(projeto, {
+      extraBadgesHtml: `
+        <span class="badge badge-primary" title="Classificação atual do Diagnóstico DIST">
+          ${LABELS_CLASSIFICACAO_DIAGNOSTICO[classificacaoAtual] || 'Em Análise'}
+        </span>
+      `
+    })}
 
     <!-- BLOCO 1: Diagnóstico DIST -->
-    <div class="card" style="margin-bottom: 28px;">
+    <div class="card" style="margin-bottom: 24px;">
       <div class="card-header">
         <div class="card-title-group">
           <span class="material-symbols-outlined">fact_check</span>
-          <h3 class="card-title">Análise Técnica & Classificação do Projeto</h3>
+          <div>
+            <h3 class="card-title" style="margin: 0;">Análise Técnica & Classificação do Projeto</h3>
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+              Responsável: <strong style="color: var(--text-main);">${diagnostico?.atualizadoPor?.nome || 'Pendente'}</strong> • 
+              Última atualização: <strong style="color: var(--text-main);">${diagnostico?.atualizadoEm ? new Date(diagnostico.atualizadoEm).toLocaleDateString('pt-BR') : 'Sem registros'}</strong>
+            </div>
+          </div>
         </div>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-salvar-diagnostico">
+        <button type="button" class="btn btn-primary" id="btn-salvar-diagnostico">
           <span class="material-symbols-outlined">save</span> Gravar Diagnóstico
         </button>
       </div>
@@ -100,14 +95,14 @@ export async function renderDiagnostico(container) {
         <!-- Classificação do Diagnóstico (5 Categorias Oficiais) -->
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label">Classificação do Diagnóstico DIST <span class="required">*</span></label>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 6px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 6px;">
             
             <!-- 1. Em estruturação -->
             <label class="diag-option-card ${classificacaoAtual === 'em_estruturacao' ? 'selected-estruturacao' : ''}">
               <input type="radio" name="diag-classificacao" value="em_estruturacao" ${classificacaoAtual === 'em_estruturacao' ? 'checked' : ''}>
               <div>
-                <div style="font-weight: var(--font-weight-bold); font-size: 12.5px; color: #0284c7;">Em estruturação</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Definição inicial de escopo ou governança</div>
+                <div style="font-weight: 700; font-size: 12.5px; color: #0284c7;">Em estruturação</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Definição inicial de escopo</div>
               </div>
             </label>
 
@@ -115,7 +110,7 @@ export async function renderDiagnostico(container) {
             <label class="diag-option-card ${classificacaoAtual === 'em_andamento' ? 'selected-andamento' : ''}">
               <input type="radio" name="diag-classificacao" value="em_andamento" ${classificacaoAtual === 'em_andamento' ? 'checked' : ''}>
               <div>
-                <div style="font-weight: var(--font-weight-bold); font-size: 12.5px; color: var(--color-success);">Em andamento</div>
+                <div style="font-weight: 700; font-size: 12.5px; color: var(--color-success, #059669);">Em andamento</div>
                 <div style="font-size: 11px; color: var(--text-muted);">Execução dentro do fluxo previsto</div>
               </div>
             </label>
@@ -124,8 +119,8 @@ export async function renderDiagnostico(container) {
             <label class="diag-option-card ${classificacaoAtual === 'requer_atencao' ? 'selected-atencao' : ''}">
               <input type="radio" name="diag-classificacao" value="requer_atencao" ${classificacaoAtual === 'requer_atencao' ? 'checked' : ''}>
               <div>
-                <div style="font-weight: var(--font-weight-bold); font-size: 12.5px; color: var(--color-warning);">Requer atenção</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Gargalos operacionais ou riscos moderados</div>
+                <div style="font-weight: 700; font-size: 12.5px; color: var(--color-warning, #d97706);">Requer atenção</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Gargalos operacionais identificados</div>
               </div>
             </label>
 
@@ -133,8 +128,8 @@ export async function renderDiagnostico(container) {
             <label class="diag-option-card ${classificacaoAtual === 'requer_decisao_estrategica' ? 'selected-decisao' : ''}">
               <input type="radio" name="diag-classificacao" value="requer_decisao_estrategica" ${classificacaoAtual === 'requer_decisao_estrategica' ? 'checked' : ''}>
               <div>
-                <div style="font-weight: var(--font-weight-bold); font-size: 12.5px; color: var(--color-danger);">Requer decisão estratégica</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Bloqueios críticos e necessidade de alinhamento superior</div>
+                <div style="font-weight: 700; font-size: 12.5px; color: var(--color-danger, #dc2626);">Decisão estratégica</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Bloqueios e alinhamento superior</div>
               </div>
             </label>
 
@@ -142,116 +137,99 @@ export async function renderDiagnostico(container) {
             <label class="diag-option-card ${classificacaoAtual === 'concluido' ? 'selected-concluido' : ''}">
               <input type="radio" name="diag-classificacao" value="concluido" ${classificacaoAtual === 'concluido' ? 'checked' : ''}>
               <div>
-                <div style="font-weight: var(--font-weight-bold); font-size: 12.5px; color: #4338ca;">Concluído</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Entregas finalizadas e projeto encerrado</div>
+                <div style="font-weight: 700; font-size: 12.5px; color: #4338ca;">Concluído</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Entregas e encerramento</div>
               </div>
             </label>
 
           </div>
         </div>
 
-        <!-- Situação Atual -->
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="diag-situacao">Situação Atual <span class="required">*</span></label>
-          <textarea id="diag-situacao" class="form-textarea" rows="4" required placeholder="Descreva o andamento atual, pendências, entregas recentes e contexto da articulação institucional...">${diagnostico?.situacaoAtual || ''}</textarea>
-          <span class="form-hint">Avaliação qualitativa do cenário operacional e executivo.</span>
+        <!-- Layout 2 Colunas para Análise Textual -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+          <!-- Situação Atual -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="diag-situacao">Situação Atual <span class="required">*</span></label>
+            <textarea id="diag-situacao" class="form-textarea" rows="4" required placeholder="Descreva o andamento atual, pendências, entregas recentes e contexto da articulação institucional...">${diagnostico?.situacaoAtual || ''}</textarea>
+            <span class="form-hint">Avaliação qualitativa do cenário operacional e executivo.</span>
+          </div>
+
+          <!-- Recomendações e Próximos Passos -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="diag-recomendacoes">Recomendações e Próximos Passos <span class="required">*</span></label>
+            <textarea id="diag-recomendacoes" class="form-textarea" rows="4" required placeholder="Ações recomendadas pela área de Integração para mitigar problemas e encaminhar as soluções...">${diagnostico?.recomendacoesProximosPassos || ''}</textarea>
+            <span class="form-hint">Orientações aos gestores das áreas para superação de gargalos.</span>
+          </div>
         </div>
 
-        <!-- Recomendações e Próximos Passos -->
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="diag-recomendacoes">Recomendações e Próximos Passos <span class="required">*</span></label>
-          <textarea id="diag-recomendacoes" class="form-textarea" rows="4" required placeholder="Ações recomendadas pela área de Integração para mitigar problemas e encaminhar as soluções...">${diagnostico?.recomendacoesProximosPassos || ''}</textarea>
-        </div>
-
-        <!-- Áreas Responsáveis pela Execução -->
+        <!-- Áreas Responsáveis pela Execução (MultiselectDropdown) -->
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label">Áreas Responsáveis pela Execução das Recomendações</label>
-          <div class="chips-container" id="diag-chips-areas" style="max-height: 120px; overflow-y: auto;">
-            ${areasInstitucionais.map(area => {
-              const isSel = areasSelecionadas.includes(area);
-              return `
-                <button type="button" class="chip-selectable ${isSel ? 'selected' : ''}" data-area="${area}">
-                  <span class="material-symbols-outlined" style="font-size: 14px;">${isSel ? 'check' : 'add'}</span>
-                  <span>${area}</span>
-                </button>
-              `;
-            }).join('')}
-          </div>
-          <span class="form-hint">Selecione uma ou mais áreas institucionais encarregadas dos encaminhamentos.</span>
+          <div id="diag-multiselect-areas-container"></div>
+          <span class="form-hint">Selecione as diretorias/divisões institucionais encarregadas dos encaminhamentos.</span>
         </div>
       </form>
     </div>
 
-    <!-- BLOCO 2: Cadastro de Risco Integrado (Requisito Seção 5) -->
+    <!-- BLOCO 2: Riscos do Projeto & Catalogação Rápida -->
     <div class="card">
       <div class="card-header">
         <div class="card-title-group">
-          <span class="material-symbols-outlined">add_alert</span>
-          <h3 class="card-title">Cadastro de Risco do Projeto</h3>
-        </div>
-        <span style="font-size: 12px; color: var(--text-muted);">
-          Os riscos cadastrados aqui alimentam a Matriz de Riscos 3x3 e o Dashboard
-        </span>
-      </div>
-
-      <form id="form-cadastro-risco-diag" style="display: flex; flex-direction: column; gap: 16px;">
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="diag-risco-titulo">Título do Risco <span class="required">*</span></label>
-          <input type="text" id="diag-risco-titulo" class="form-input" required placeholder="Ex: Atraso na liberação de portas de firewall pelo parceiro externo">
-          <span class="form-hint">Identificação breve e clara do evento de risco.</span>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="diag-risco-area">Área Responsável <span class="required">*</span></label>
-            <select id="diag-risco-area" class="form-select" required>
-              ${areasParaRiscos.map(a => `
-                <option value="${a}" ${a === 'DIST - Divisão de Integração Setorial' ? 'selected' : ''}>${a}</option>
-              `).join('')}
-            </select>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label" for="diag-risco-p">Probabilidade (1 a 3) <span class="required">*</span></label>
-              <select id="diag-risco-p" class="form-select">
-                <option value="1">1 — Baixa</option>
-                <option value="2" selected>2 — Média</option>
-                <option value="3">3 — Alta</option>
-              </select>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label" for="diag-risco-i">Impacto (1 a 3) <span class="required">*</span></label>
-              <select id="diag-risco-i" class="form-select">
-                <option value="1">1 — Baixo</option>
-                <option value="2" selected>2 — Médio</option>
-                <option value="3">3 — Alto</option>
-              </select>
-            </div>
+          <span class="material-symbols-outlined">shield_with_heart</span>
+          <div>
+            <h3 class="card-title" style="margin: 0;">Riscos Catalogados neste Projeto</h3>
+            <span style="font-size: 11.5px; color: var(--text-muted);">
+              Total: ${riscos.length} risco(s) monitorado(s) na Matriz 3x3
+            </span>
           </div>
         </div>
-
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="diag-risco-desc">Descrição do Risco</label>
-          <textarea id="diag-risco-desc" class="form-textarea" rows="3" placeholder="Explique o risco, possíveis consequências, causas raízes e impacto no projeto..."></textarea>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-hover); padding: 12px 16px; border-radius: var(--radius-button); border: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 12.5px; font-weight: var(--font-weight-semibold);">Pontuação Calculada:</span>
-            <span id="diag-preview-score" class="badge badge-warning">2 × 2 = 4 pts (Moderado)</span>
-          </div>
-
-          <button type="button" class="btn btn-primary" id="btn-adicionar-risco-diag">
-            <span class="material-symbols-outlined">add_task</span> Adicionar Risco
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-ir-matriz-riscos">
+            <span class="material-symbols-outlined">grid_view</span> Ver Matriz Completa
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-abrir-modal-risco">
+            <span class="material-symbols-outlined">add_alert</span> Mapear Risco
           </button>
         </div>
-      </form>
+      </div>
+
+      <!-- Resumo Visual dos Riscos em Lista Arejada -->
+      <div id="diag-riscos-list">
+        ${riscos.length === 0 ? `
+          <div style="text-align: center; padding: 28px 16px; background: var(--bg-hover, #f8fafc); border-radius: var(--radius-card, 8px); border: 1px dashed var(--border-color, #cbd5e1);">
+            <span class="material-symbols-outlined" style="font-size: 32px; color: var(--text-muted); margin-bottom: 6px;">add_alert</span>
+            <div style="font-weight: 600; color: var(--text-main); font-size: 13.5px;">Nenhum risco catalogado para este projeto</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Clique em "Mapear Risco" para registrar ameaças à execução do projeto.</p>
+          </div>
+        ` : `
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+            ${riscos.map(r => {
+              const { pontuacao, classificacao } = calcularClassificacaoRisco(r.probabilidade, r.impacto);
+              const badgeClass = classificacao === 'Alto' ? 'badge-danger' : (classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
+              return `
+                <div style="padding: 12px 14px; background: #ffffff; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
+                    <div style="font-weight: 600; font-size: 13px; color: var(--text-main);">
+                      #${r.numero} ${r.titulo}
+                    </div>
+                    <span class="badge ${badgeClass}" style="font-size: 10px; padding: 2px 6px; flex-shrink: 0;">
+                      ${classificacao} (${pontuacao} pts)
+                    </span>
+                  </div>
+                  <div style="font-size: 11.5px; color: var(--text-muted); display: flex; justify-content: space-between;">
+                    <span>Área: <strong style="color: var(--text-secondary);">${r.areaResponsavel || 'Compartilhada'}</strong></span>
+                    <span>P: ${r.probabilidade} | I: ${r.impacto}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
     </div>
   `;
 
-  // Estilos inline específicos para os cards das 5 classificações
+  // Estilos específicos para os cards das 5 classificações
   const styleEl = document.createElement('style');
   styleEl.textContent = `
     .diag-option-card {
@@ -259,31 +237,31 @@ export async function renderDiagnostico(container) {
       align-items: center;
       gap: 10px;
       padding: 10px 14px;
-      border: 2px solid var(--border-color);
-      border-radius: var(--radius-card);
+      border: 2px solid var(--border-color, #e2e8f0);
+      border-radius: var(--radius-card, 8px);
       background: #ffffff;
       cursor: pointer;
-      transition: var(--transition-fast);
+      transition: all 0.15s ease;
     }
     .diag-option-card:hover {
       border-color: #cbd5e1;
-      background: var(--bg-hover-subtle);
+      background: var(--bg-hover, #f8fafc);
     }
     .diag-option-card.selected-estruturacao {
       border-color: #0284c7;
       background: #f0f9ff;
     }
     .diag-option-card.selected-andamento {
-      border-color: var(--color-success);
-      background: var(--color-success-bg);
+      border-color: var(--color-success, #059669);
+      background: #f0fdf4;
     }
     .diag-option-card.selected-atencao {
-      border-color: var(--color-warning);
-      background: var(--color-warning-bg);
+      border-color: var(--color-warning, #d97706);
+      background: #fffbeb;
     }
     .diag-option-card.selected-decisao {
-      border-color: var(--color-danger);
-      background: var(--color-danger-bg);
+      border-color: var(--color-danger, #dc2626);
+      background: #fef2f2;
     }
     .diag-option-card.selected-concluido {
       border-color: #4338ca;
@@ -291,6 +269,25 @@ export async function renderDiagnostico(container) {
     }
   `;
   container.appendChild(styleEl);
+
+  // Conecta eventos do Card de Contexto
+  attachProjectContextCardEvents(container);
+
+  // Inicializa o Dropdown Multiselect de Áreas Executoras
+  renderMultiselectDropdown(
+    container.querySelector('#diag-multiselect-areas-container'),
+    {
+      id: 'diag-areas-multiselect',
+      options: areasInstitucionais,
+      selectedValues: areasSelecionadas,
+      placeholder: 'Selecione as áreas institucionais executoras...',
+      searchPlaceholder: 'Buscar diretoria ou divisão...',
+      onChange: (novasAreas) => {
+        areasSelecionadas = novasAreas;
+        setDirty(true);
+      }
+    }
+  );
 
   const formDiag = container.querySelector('#form-diagnostico');
   const btnSalvar = container.querySelector('#btn-salvar-diagnostico');
@@ -305,17 +302,16 @@ export async function renderDiagnostico(container) {
   formDiag.querySelectorAll('input[name="diag-classificacao"]').forEach(radio => {
     radio.addEventListener('change', () => {
       setDirty(true);
-      renderDiagnostico(container);
-    });
-  });
-
-  // Chips de áreas
-  container.querySelectorAll('#diag-chips-areas .chip-selectable').forEach(chip => {
-    chip.addEventListener('click', () => {
-      chip.classList.toggle('selected');
-      const icon = chip.querySelector('.material-symbols-outlined');
-      icon.textContent = chip.classList.contains('selected') ? 'check' : 'add';
-      setDirty(true);
+      container.querySelectorAll('.diag-option-card').forEach(card => {
+        card.className = 'diag-option-card';
+      });
+      const selectedVal = radio.value;
+      const parentCard = radio.closest('.diag-option-card');
+      if (selectedVal === 'em_estruturacao') parentCard?.classList.add('selected-estruturacao');
+      if (selectedVal === 'em_andamento') parentCard?.classList.add('selected-andamento');
+      if (selectedVal === 'requer_atencao') parentCard?.classList.add('selected-atencao');
+      if (selectedVal === 'requer_decisao_estrategica') parentCard?.classList.add('selected-decisao');
+      if (selectedVal === 'concluido') parentCard?.classList.add('selected-concluido');
     });
   });
 
@@ -330,11 +326,6 @@ export async function renderDiagnostico(container) {
     }
 
     const classificacao = container.querySelector('input[name="diag-classificacao"]:checked')?.value || 'em_andamento';
-    
-    const areasResponsaveisExecucao = [];
-    container.querySelectorAll('#diag-chips-areas .chip-selectable.selected').forEach(c => {
-      areasResponsaveisExecucao.push(c.getAttribute('data-area'));
-    });
 
     try {
       btnSalvar.disabled = true;
@@ -346,7 +337,7 @@ export async function renderDiagnostico(container) {
         classificacao,
         situacaoAtual,
         recomendacoesProximosPassos,
-        areasResponsaveisExecucao
+        areasResponsaveisExecucao: areasSelecionadas
       }, currentUser);
 
       setDirty(false);
@@ -360,67 +351,128 @@ export async function renderDiagnostico(container) {
     }
   });
 
-  // Preview dinâmico de score do Risco
-  const pSelect = container.querySelector('#diag-risco-p');
-  const iSelect = container.querySelector('#diag-risco-i');
-  const previewScore = container.querySelector('#diag-preview-score');
+  // Navegar para Matriz de Riscos
+  container.querySelector('#btn-ir-matriz-riscos')?.addEventListener('click', () => {
+    guardedNavigate(() => setActiveTab('matriz-riscos'));
+  });
 
-  const updatePreviewRisco = () => {
-    const p = parseInt(pSelect.value, 10);
-    const i = parseInt(iSelect.value, 10);
-    const { pontuacao, classificacao } = calcularClassificacaoRisco(p, i);
-    const badgeClass = classificacao === 'Alto' ? 'badge-danger' : (classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
-    previewScore.className = `badge ${badgeClass}`;
-    previewScore.textContent = `${p} × ${i} = ${pontuacao} pts (${classificacao})`;
+  // Modal para Adicionar Novo Risco
+  const abrirModalCadastroRisco = () => {
+    const content = `
+      <form id="form-modal-risco" style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="mr-titulo">Título do Risco <span class="required">*</span></label>
+          <input type="text" id="mr-titulo" class="form-input" required placeholder="Ex: Atraso na liberação de acessos ao ambiente de homologação">
+          <span class="form-hint">Identificação breve e clara do evento de risco.</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="mr-area">Área Responsável <span class="required">*</span></label>
+            <select id="mr-area" class="form-select" required>
+              ${areasParaRiscos.map(a => `
+                <option value="${a}" ${a === 'DIST - Divisão de Integração Setorial' ? 'selected' : ''}>${a}</option>
+              `).join('')}
+            </select>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="mr-p">Probabilidade (1 a 3)</label>
+              <select id="mr-p" class="form-select">
+                <option value="1">1 — Baixa</option>
+                <option value="2" selected>2 — Média</option>
+                <option value="3">3 — Alta</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="mr-i">Impacto (1 a 3)</label>
+              <select id="mr-i" class="form-select">
+                <option value="1">1 — Baixo</option>
+                <option value="2" selected>2 — Médio</option>
+                <option value="3">3 — Alto</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="mr-desc">Descrição e Mitigação do Risco</label>
+          <textarea id="mr-desc" class="form-textarea" rows="3" placeholder="Explique as consequências, causas raízes e ações planejadas..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-hover, #f8fafc); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0);">
+          <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Severidade Calculada:</span>
+          <span id="mr-preview-score" class="badge badge-warning">2 × 2 = 4 pts (Moderado)</span>
+        </div>
+      </form>
+    `;
+
+    const footerHtml = `
+      <button type="button" class="btn btn-secondary" id="btn-mr-cancelar">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btn-mr-salvar">
+        <span class="material-symbols-outlined">add_task</span> Salvar Risco
+      </button>
+    `;
+
+    const modal = openModal({
+      title: 'Catalogar Novo Risco do Projeto',
+      content,
+      footerHtml,
+      maxWidth: '560px'
+    });
+
+    const pSel = modal.querySelector('#mr-p');
+    const iSel = modal.querySelector('#mr-i');
+    const previewBadge = modal.querySelector('#mr-preview-score');
+
+    const updateScore = () => {
+      const p = parseInt(pSel.value, 10);
+      const i = parseInt(iSel.value, 10);
+      const { pontuacao, classificacao } = calcularClassificacaoRisco(p, i);
+      const badgeClass = classificacao === 'Alto' ? 'badge-danger' : (classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
+      previewBadge.className = `badge ${badgeClass}`;
+      previewBadge.textContent = `${p} × ${i} = ${pontuacao} pts (${classificacao})`;
+    };
+
+    pSel.addEventListener('change', updateScore);
+    iSel.addEventListener('change', updateScore);
+    updateScore();
+
+    modal.querySelector('#btn-mr-cancelar').addEventListener('click', closeModal);
+
+    modal.querySelector('#btn-mr-salvar').addEventListener('click', async () => {
+      const titulo = modal.querySelector('#mr-titulo').value.trim();
+      if (!titulo) {
+        showToast('O título do risco é obrigatório.', 'warning');
+        return;
+      }
+
+      const areaResponsavel = modal.querySelector('#mr-area').value;
+      const descricao = modal.querySelector('#mr-desc').value.trim();
+      const p = parseInt(pSel.value, 10);
+      const i = parseInt(iSel.value, 10);
+
+      try {
+        const { currentUser } = getState();
+        const salvo = await RiscosService.salvarRisco({
+          projetoId: projeto.id,
+          titulo,
+          areaResponsavel,
+          descricao,
+          probabilidade: p,
+          impacto: i
+        }, currentUser);
+
+        showToast(`Risco #${salvo.numero} catalogado com sucesso!`, 'success');
+        closeModal();
+        renderDiagnostico(container);
+      } catch (err) {
+        showToast(`Erro ao salvar risco: ${err.message}`, 'danger');
+      }
+    });
   };
 
-  pSelect.addEventListener('change', updatePreviewRisco);
-  iSelect.addEventListener('change', updatePreviewRisco);
-  updatePreviewRisco();
-
-  // Botão Adicionar Risco pelo Diagnóstico
-  const btnAddRisco = container.querySelector('#btn-adicionar-risco-diag');
-  btnAddRisco.addEventListener('click', async () => {
-    const titulo = container.querySelector('#diag-risco-titulo').value.trim();
-    if (!titulo) {
-      showToast('O título do risco é obrigatório.', 'warning');
-      container.querySelector('#diag-risco-titulo').focus();
-      return;
-    }
-
-    const areaResponsavel = container.querySelector('#diag-risco-area').value;
-    const descricao = container.querySelector('#diag-risco-desc').value.trim();
-    const p = parseInt(pSelect.value, 10);
-    const i = parseInt(iSelect.value, 10);
-
-    const { currentUser } = getState();
-
-    try {
-      btnAddRisco.disabled = true;
-      btnAddRisco.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span> Salvando...`;
-
-      const salvo = await RiscosService.salvarRisco({
-        projetoId: projeto.id,
-        titulo,
-        areaResponsavel,
-        descricao,
-        probabilidade: p,
-        impacto: i
-      }, currentUser);
-
-      showToast(`Risco #${salvo.numero} adicionado com sucesso!`, 'success');
-      
-      // Limpa formulário após cadastro bem-sucedido (Regra Seção 5)
-      container.querySelector('#diag-risco-titulo').value = '';
-      container.querySelector('#diag-risco-desc').value = '';
-      pSelect.value = '2';
-      iSelect.value = '2';
-      updatePreviewRisco();
-    } catch (err) {
-      showToast(`Erro ao adicionar risco: ${err.message}`, 'danger');
-    } finally {
-      btnAddRisco.disabled = false;
-      btnAddRisco.innerHTML = `<span class="material-symbols-outlined">add_task</span> Adicionar Risco`;
-    }
-  });
+  container.querySelector('#btn-abrir-modal-risco')?.addEventListener('click', abrirModalCadastroRisco);
 }

@@ -1,6 +1,7 @@
 /**
  * View: Matriz de Riscos 3x3
  * Metodologia P x I, Grid 3x3 interativo, chips numerados e lista de riscos mapeados
+ * Layout moderno, card de contexto unificado e metodologia recolhível
  */
 import { getState, canEdit } from '../store/state.js';
 import { RiscosService, calcularClassificacaoRisco } from '../services/riscos.service.js';
@@ -8,6 +9,7 @@ import { ProjetosService } from '../services/projetos.service.js';
 import { openModal, closeModal } from '../components/modal.component.js';
 import { showToast } from '../components/toast.component.js';
 import { getAreasRiscos } from '../config/areas-institucionais.js';
+import { renderProjectContextCard, attachProjectContextCardEvents } from '../components/project-context.component.js';
 
 export async function renderMatrizRiscos(container) {
   const { activeProject } = getState();
@@ -18,7 +20,7 @@ export async function renderMatrizRiscos(container) {
         <span class="material-symbols-outlined" style="font-size: 28px;">info</span>
         <div>
           <h3 style="font-size: 15px; margin-bottom: 4px;">Nenhum projeto ativo selecionado</h3>
-          <p style="font-size: 13px;">Selecione um projeto no topo da página ou na aba "Projetos" para gerenciar sua Matriz de Riscos.</p>
+          <p style="font-size: 13px;">Selecione um projeto na barra lateral ou na aba "Projetos" para gerenciar sua Matriz de Riscos.</p>
         </div>
       </div>
     `;
@@ -32,7 +34,7 @@ export async function renderMatrizRiscos(container) {
         <span class="material-symbols-outlined" style="font-size: 48px; color: var(--color-warning); margin-bottom: 12px;">lock</span>
         <h2 class="section-title" style="margin-bottom: 8px;">Módulo DIST Não Habilitado</h2>
         <p style="color: var(--text-secondary); max-width: 560px; margin: 0 auto 20px; line-height: 1.5;">
-          A Matriz de Riscos requer a ativação do módulo de acompanhamento DIST para o projeto <strong>"${activeProject.nome}"</strong>.
+          A Matriz de Riscos requer a ativação do módulo de acompanhamento DIST para o projeto <strong>"${activeProject.nome || activeProject.nome_projeto}"</strong>.
           Os dados já catalogados estão preservados com segurança.
         </p>
         <span class="badge badge-neutral">Módulo DIST Desativado</span>
@@ -42,56 +44,34 @@ export async function renderMatrizRiscos(container) {
   }
 
   const projeto = await ProjetosService.obterPorId(activeProject.id) || activeProject;
-  const entesTexto = Array.isArray(projeto.entesExternos) && projeto.entesExternos.length > 0
-    ? projeto.entesExternos.join(', ')
-    : (projeto.entesExternos || 'Nenhum informado');
-
-  const areasDetranTexto = Array.isArray(projeto.areasDetranEnvolvidas) && projeto.areasDetranEnvolvidas.length > 0
-    ? projeto.areasDetranEnvolvidas.join(', ')
-    : 'Nenhuma selecionada';
 
   container.innerHTML = `
-    <!-- Cabeçalho Limpo e Arejado (Abordagem Clean) -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
-      <div>
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-          <h1 class="page-title">Matriz de Riscos: ${projeto.nome}</h1>
-          <span class="badge badge-success">Módulo DIST Ativo</span>
-        </div>
-        <p class="subtitle" style="margin-bottom: 8px;">Mapeamento qualitativo de probabilidade e impacto para antecipação de ameaças aos objetivos do projeto.</p>
-        <div style="display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--text-muted); flex-wrap: wrap;">
-          <span>Área Gestora: <strong style="color: var(--text-main);">${projeto.areaGestora || 'DSV'}</strong></span>
-          <span>•</span>
-          <span>Entes Externos: <strong style="color: var(--text-main);">${entesTexto}</strong></span>
-          <span>•</span>
-          <span>Áreas Envolvidas: <strong style="color: var(--text-main);">${areasDetranTexto}</strong></span>
-        </div>
-      </div>
-
-      <div style="display: flex; gap: 10px;">
-        <button type="button" class="btn btn-primary" id="btn-cadastrar-risco">
+    <!-- Card Unificado de Contexto do Projeto Ativo -->
+    ${renderProjectContextCard(projeto, {
+      extraBadgesHtml: `
+        <button type="button" class="btn btn-primary btn-sm" id="btn-cadastrar-risco">
           <span class="material-symbols-outlined">add_alert</span> Mapear Novo Risco
         </button>
-      </div>
-    </div>
+      `
+    })}
 
-    <!-- Metodologia e Escalas (Conforme Seção 6) -->
-    <div class="methodology-box">
-      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-        <div style="display: flex; align-items: center; gap: 8px; font-weight: var(--font-weight-bold); font-size: 13px; color: var(--text-main);">
-          <span class="material-symbols-outlined" style="color: var(--color-primary); font-size: 20px;">info</span>
-          <span>Metodologia de Classificação Institucional</span>
+    <!-- Metodologia e Escalas (Acordeão Recolhível Clean) -->
+    <details class="methodology-box" style="margin-bottom: 20px; cursor: pointer; border-radius: 8px;">
+      <summary style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: var(--text-main); user-select: none;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="material-symbols-outlined" style="color: var(--color-primary); font-size: 18px;">info</span>
+          <span>Metodologia P × I (Clique para expandir/ocultar detalhes)</span>
         </div>
-        <span style="font-size: 11.5px; color: var(--text-muted);">
-          Fórmula: <strong>Pontuação = Probabilidade (1 a 3) × Impacto (1 a 3)</strong>
+        <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">
+          Fórmula: <strong>P (1 a 3) × I (1 a 3)</strong> ▾
         </span>
-      </div>
+      </summary>
 
-      <div class="methodology-grid">
+      <div class="methodology-grid" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color-light);">
         <div class="methodology-item">
           <div class="methodology-indicator indicator-baixo"></div>
           <div>
-            <div style="font-weight: var(--font-weight-bold); font-size: 12px; color: var(--color-success);">Risco Baixo (Score 1 ou 2)</div>
+            <div style="font-weight: 700; font-size: 12px; color: var(--color-success, #059669);">Risco Baixo (Score 1 ou 2)</div>
             <div style="font-size: 11px; color: var(--text-muted);">Monitoramento rotineiro pela equipe</div>
           </div>
         </div>
@@ -99,7 +79,7 @@ export async function renderMatrizRiscos(container) {
         <div class="methodology-item">
           <div class="methodology-indicator indicator-moderado"></div>
           <div>
-            <div style="font-weight: var(--font-weight-bold); font-size: 12px; color: var(--color-warning);">Risco Moderado (Score 3 ou 4)</div>
+            <div style="font-weight: 700; font-size: 12px; color: var(--color-warning, #d97706);">Risco Moderado (Score 3 ou 4)</div>
             <div style="font-size: 11px; color: var(--text-muted);">Acompanhamento tático e plano de mitigação</div>
           </div>
         </div>
@@ -107,7 +87,7 @@ export async function renderMatrizRiscos(container) {
         <div class="methodology-item">
           <div class="methodology-indicator indicator-alto"></div>
           <div>
-            <div style="font-weight: var(--font-weight-bold); font-size: 12px; color: var(--color-danger);">Risco Alto (Score 6 ou 9)</div>
+            <div style="font-weight: 700; font-size: 12px; color: var(--color-danger, #dc2626);">Risco Alto (Score 6 ou 9)</div>
             <div style="font-size: 11px; color: var(--text-muted);">Alerta executivo e intervenção prioritária</div>
           </div>
         </div>
@@ -116,10 +96,10 @@ export async function renderMatrizRiscos(container) {
       <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color-light);">
         * <em>Nota metodológica:</em> Na escala discreta de 1 a 3, as pontuações <strong>5, 7 e 8 não são resultados possíveis</strong>.
       </div>
-    </div>
+    </details>
 
     <!-- Matriz 3x3 Interativa -->
-    <div class="matrix-container">
+    <div class="matrix-container" style="margin-bottom: 24px;">
       <!-- Eixo Y Vertical Label -->
       <div class="matrix-y-axis-label">
         ▲ Probabilidade (1 a 3)
@@ -131,7 +111,7 @@ export async function renderMatrizRiscos(container) {
         </div>
 
         <!-- Eixo X Horizontal Label -->
-        <div style="text-align: center; font-size: 12px; font-weight: var(--font-weight-bold); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-top: 10px;">
+        <div style="text-align: center; font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-top: 10px;">
           Impacto (1 a 3) ►
         </div>
       </div>
@@ -166,6 +146,9 @@ export async function renderMatrizRiscos(container) {
       </div>
     </div>
   `;
+
+  // Conecta eventos do Card de Contexto
+  attachProjectContextCardEvents(container);
 
   // Carrega riscos vinculados ao projeto ativo
   let riscos = await RiscosService.listarPorProjeto(activeProject.id);
@@ -250,55 +233,53 @@ export async function renderMatrizRiscos(container) {
         grid.appendChild(cell);
       });
     });
-
-    // Linha inferior com os rótulos do Eixo X
-    const emptyCorner = document.createElement('div');
-    emptyCorner.className = 'axis-corner-empty';
-    grid.appendChild(emptyCorner);
-
-    impactos.forEach(iObj => {
-      const colHeader = document.createElement('div');
-      colHeader.className = 'axis-col-header';
-      colHeader.textContent = iObj.label;
-      grid.appendChild(colHeader);
-    });
   };
 
   // Renderiza Tabela de Riscos Mapeados
   const renderTabelaRiscos = () => {
     const tbody = container.querySelector('#tbody-riscos-mapeados');
-    container.querySelector('#tag-total-riscos-proj').textContent = `${riscos.length} riscos cadastrados`;
+    const tagTotal = container.querySelector('#tag-total-riscos-proj');
+
+    tagTotal.textContent = `${riscos.length} risco${riscos.length !== 1 ? 's' : ''}`;
 
     if (riscos.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">Nenhum risco catalogado para este projeto. Utilize o botão acima para adicionar.</td></tr>`;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
+            Nenhum risco catalogado para este projeto. Utilize o botão "Mapear Novo Risco" ou clique diretamente em uma célula da Matriz acima.
+          </td>
+        </tr>
+      `;
       return;
     }
 
     tbody.innerHTML = riscos.map(r => {
-      const badgeClass = r.classificacao === 'Alto' ? 'badge-danger' : (r.classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
+      const { pontuacao, classificacao } = calcularClassificacaoRisco(r.probabilidade, r.impacto);
+      const badgeClass = classificacao === 'Alto' ? 'badge-danger' : (classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
 
       return `
         <tr>
-          <td><span class="risk-chip chip-${r.classificacao.toLowerCase()}" style="cursor: default;">#${r.numero}</span></td>
           <td>
-            <div style="font-weight: var(--font-weight-bold); color: var(--text-main); font-size: 13px;">${r.titulo}</div>
-            <div class="risk-table-item-desc" title="${r.descricao || ''}">${r.descricao || 'Sem descrição'}</div>
-          </td>
-          <td><span class="tag">${r.areaResponsavel || 'Não informada'}</span></td>
-          <td style="text-align: center; font-weight: var(--font-weight-bold); font-size: 13px;">
-            ${r.probabilidade} × ${r.impacto} = <span style="color: var(--color-primary);">${r.pontuacao}</span>
+            <span class="chip-number">#${r.numero}</span>
           </td>
           <td>
-            <span class="badge ${badgeClass}">${r.classificacao}</span>
+            <div style="font-weight: var(--font-weight-bold); color: var(--text-main); font-size: 13.5px;">${r.titulo}</div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">${r.descricao || 'Sem descrição detalhada'}</div>
+          </td>
+          <td>
+            <span class="tag">${r.areaResponsavel || 'Compartilhada'}</span>
+          </td>
+          <td style="text-align: center; font-size: 12px; font-weight: var(--font-weight-semibold); color: var(--text-main);">
+            ${r.probabilidade} × ${r.impacto} = ${pontuacao}
+          </td>
+          <td>
+            <span class="badge ${badgeClass}">${classificacao}</span>
           </td>
           <td style="text-align: right; white-space: nowrap;">
-            <button type="button" class="btn btn-secondary btn-sm btn-ver-risco" data-id="${r.id}" title="Ver detalhes completos">
-              <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm btn-editar-risco" data-id="${r.id}" title="Editar risco">
+            <button type="button" class="btn btn-secondary btn-sm btn-editar-risco" data-id="${r.id}" title="Editar Risco">
               <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
             </button>
-            <button type="button" class="btn btn-secondary btn-sm btn-excluir-risco" data-id="${r.id}" title="Excluir risco" style="color: var(--color-danger);">
+            <button type="button" class="btn btn-secondary btn-sm btn-excluir-risco" data-id="${r.id}" title="Excluir Risco" style="color: var(--color-danger); margin-left: 4px;">
               <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
             </button>
           </td>
@@ -306,32 +287,26 @@ export async function renderMatrizRiscos(container) {
       `;
     }).join('');
 
-    tbody.querySelectorAll('.btn-ver-risco').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        const r = riscos.find(x => x.id === id);
-        if (r) abrirModalDetalhesRisco(r);
-      });
-    });
-
+    // Listeners Editar
     tbody.querySelectorAll('.btn-editar-risco').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
-        const r = riscos.find(x => x.id === id);
-        if (r) abrirModalFormRisco(r);
+        const risco = riscos.find(x => x.id === id);
+        if (risco) abrirModalFormRisco(risco);
       });
     });
 
+    // Listeners Excluir
     tbody.querySelectorAll('.btn-excluir-risco').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        const r = riscos.find(x => x.id === id);
-        if (!r) return;
+        const risco = riscos.find(x => x.id === id);
+        if (!risco) return;
 
-        if (confirm(`Deseja realmente excluir o Risco #${r.numero} ("${r.titulo}")?`)) {
+        if (confirm(`Tem certeza que deseja remover o Risco #${risco.numero} (${risco.titulo})?`)) {
           const { currentUser } = getState();
           await RiscosService.excluirRisco(id, currentUser);
-          showToast(`Risco #${r.numero} excluído.`, 'info');
+          showToast(`Risco #${risco.numero} excluído.`, 'info');
           riscos = await RiscosService.listarPorProjeto(activeProject.id);
           renderGridMatriz();
           renderTabelaRiscos();
@@ -340,23 +315,91 @@ export async function renderMatrizRiscos(container) {
     });
   };
 
-  // Modal para múltiplos riscos na mesma célula
-  const abrirModalMultiplosRiscos = (listaRiscos, p, i, classificacao) => {
+  // Modal para Visualizar Detalhes do Risco ao Clicar no Chip
+  const abrirModalDetalhesRisco = (risco) => {
+    const { pontuacao, classificacao } = calcularClassificacaoRisco(risco.probabilidade, risco.impacto);
+    const badgeClass = classificacao === 'Alto' ? 'badge-danger' : (classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
+
     const content = `
-      <div>
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
-          Esta célula (Probabilidade ${p} × Impacto ${i} = ${p * i} pts • <strong>${classificacao}</strong>) possui <strong>${listaRiscos.length} riscos</strong> vinculados:
-        </p>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+          <div>
+            <span class="chip-number" style="font-size: 13px;">#${risco.numero}</span>
+            <h3 style="font-size: 16px; font-weight: var(--font-weight-bold); margin-top: 6px; color: var(--text-main);">${risco.titulo}</h3>
+          </div>
+          <span class="badge ${badgeClass}" style="font-size: 12px; padding: 4px 10px;">
+            ${classificacao} (${pontuacao} pts)
+          </span>
+        </div>
+
+        <div style="background: var(--bg-hover); padding: 12px 14px; border-radius: var(--radius-button); border: 1px solid var(--border-color); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12.5px;">
+          <div>
+            <span style="color: var(--text-muted); display: block; font-size: 11px; text-transform: uppercase;">Área Responsável</span>
+            <strong style="color: var(--text-main);">${risco.areaResponsavel || 'Compartilhada'}</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted); display: block; font-size: 11px; text-transform: uppercase;">Classificação P × I</span>
+            <strong>P = ${risco.probabilidade} | I = ${risco.impacto}</strong>
+          </div>
+        </div>
+
+        <div>
+          <h4 style="font-size: 12px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">Descrição e Consequências</h4>
+          <p style="font-size: 13.5px; line-height: 1.5; color: var(--text-main); background: #ffffff; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-button);">
+            ${risco.descricao || 'Sem descrição cadastrada.'}
+          </p>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); border-top: 1px solid var(--border-color-light); padding-top: 10px;">
+          <span>Registrado por: <strong>${risco.criadoPor?.nome || 'Sistema'}</strong></span>
+          <span>Atualizado em: <strong>${risco.atualizadoEm ? new Date(risco.atualizadoEm).toLocaleDateString('pt-BR') : '—'}</strong></span>
+        </div>
+      </div>
+    `;
+
+    const footerHtml = `
+      <button type="button" class="btn btn-secondary" id="btn-modal-fechar">Fechar</button>
+      <button type="button" class="btn btn-primary" id="btn-modal-editar-direto">
+        <span class="material-symbols-outlined">edit</span> Editar Risco
+      </button>
+    `;
+
+    const modal = openModal({
+      title: `Detalhes do Risco #${risco.numero}`,
+      content,
+      footerHtml,
+      maxWidth: '520px'
+    });
+
+    modal.querySelector('#btn-modal-fechar').addEventListener('click', closeModal);
+    modal.querySelector('#btn-modal-editar-direto').addEventListener('click', () => {
+      closeModal();
+      abrirModalFormRisco(risco);
+    });
+  };
+
+  // Modal para listar múltiplos riscos de uma mesma célula da Matriz
+  const abrirModalMultiplosRiscos = (listaRiscos, p, i, classificacao) => {
+    const badgeClass = classificacao === 'Alto' ? 'badge-danger' : (classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
+
+    const content = `
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">
+            Existem <strong>${listaRiscos.length} riscos</strong> classificados nesta coordenada da matriz:
+          </p>
+          <span class="badge ${badgeClass}">P:${p} × I:${i} (${classificacao})</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto;">
           ${listaRiscos.map(r => `
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-hover); border-radius: var(--radius-button); border: 1px solid var(--border-color);">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="risk-chip chip-${classificacao.toLowerCase()}">#${r.numero}</span>
-                <span style="font-weight: var(--font-weight-bold); font-size: 13px;">${r.titulo}</span>
+            <div class="card" style="padding: 12px 14px; background: #ffffff; cursor: pointer; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;" data-risco-id="${r.id}">
+              <div>
+                <span class="chip-number">#${r.numero}</span>
+                <strong style="font-size: 13px; margin-left: 6px; color: var(--text-main);">${r.titulo}</strong>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Área: ${r.areaResponsavel}</div>
               </div>
-              <button type="button" class="btn btn-outline btn-sm btn-item-ver-detalhe" data-id="${r.id}">
-                Ver Detalhes
-              </button>
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--text-muted);">chevron_right</span>
             </div>
           `).join('')}
         </div>
@@ -364,193 +407,147 @@ export async function renderMatrizRiscos(container) {
     `;
 
     const footerHtml = `
-      <button type="button" class="btn btn-secondary" id="btn-close-multi-modal">Fechar</button>
+      <button type="button" class="btn btn-secondary" id="btn-multi-fechar">Fechar</button>
+      <button type="button" class="btn btn-primary" id="btn-multi-novo">
+        <span class="material-symbols-outlined">add</span> Adicionar Mais um Risco nesta Célula
+      </button>
     `;
 
     const modal = openModal({
-      title: `Riscos na Célula P:${p} × I:${i}`,
+      title: `Riscos com Probabilidade ${p} e Impacto ${i}`,
       content,
       footerHtml,
       maxWidth: '560px'
     });
 
-    modal.querySelector('#btn-close-multi-modal').addEventListener('click', closeModal);
-    modal.querySelectorAll('.btn-item-ver-detalhe').forEach(btn => {
-      btn.addEventListener('click', () => {
-        closeModal();
-        const id = btn.getAttribute('data-id');
-        const r = listaRiscos.find(x => x.id === id);
-        if (r) abrirModalDetalhesRisco(r);
+    modal.querySelector('#btn-multi-fechar').addEventListener('click', closeModal);
+    modal.querySelector('#btn-multi-novo').addEventListener('click', () => {
+      closeModal();
+      abrirModalFormRisco(null, p, i);
+    });
+
+    modal.querySelectorAll('[data-risco-id]').forEach(item => {
+      item.addEventListener('click', () => {
+        const rId = item.getAttribute('data-risco-id');
+        const r = listaRiscos.find(x => x.id === rId);
+        if (r) {
+          closeModal();
+          abrirModalDetalhesRisco(r);
+        }
       });
     });
   };
 
-  // Modal Detalhes Completos do Risco
-  const abrirModalDetalhesRisco = (r) => {
-    const badgeClass = r.classificacao === 'Alto' ? 'badge-danger' : (r.classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
-
-    const content = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color-light); padding-bottom: 12px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="risk-chip chip-${r.classificacao.toLowerCase()}" style="font-size: 13px; padding: 4px 10px;">#${r.numero}</span>
-            <span class="badge ${badgeClass}">${r.classificacao}</span>
-          </div>
-          <span style="font-size: 13px; font-weight: var(--font-weight-bold); color: var(--color-primary);">
-            Pontuação: ${r.probabilidade} × ${r.impacto} = ${r.pontuacao} pts
-          </span>
-        </div>
-
-        <div>
-          <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Área Responsável</h4>
-          <span class="tag" style="font-size: 12.5px;">${r.areaResponsavel || 'Não informada'}</span>
-        </div>
-
-        <div>
-          <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">Descrição do Risco</h4>
-          <p style="font-size: 13.5px; line-height: 1.6; color: var(--text-main); background: var(--bg-hover-subtle); padding: 12px 16px; border-radius: var(--radius-button); border: 1px solid var(--border-color-light);">
-            ${r.descricao || 'Nenhuma descrição detalhada informada.'}
-          </p>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); border-top: 1px solid var(--border-color-light); padding-top: 12px;">
-          <span>Registrado em: <strong>${r.criadoEm ? new Date(r.criadoEm).toLocaleDateString('pt-BR') : '—'}</strong></span>
-          <span>Por: <strong>${r.atualizadoPor?.nome || 'Usuário'}</strong></span>
-        </div>
-      </div>
-    `;
-
-    const footerHtml = `
-      <button type="button" class="btn btn-secondary" id="btn-modal-risco-fechar">Fechar</button>
-      <button type="button" class="btn btn-primary" id="btn-modal-risco-editar">
-        <span class="material-symbols-outlined">edit</span> Editar Risco
-      </button>
-    `;
-
-    const modal = openModal({
-      title: `Risco #${r.numero}: ${r.titulo}`,
-      content,
-      footerHtml,
-      maxWidth: '600px'
-    });
-
-    modal.querySelector('#btn-modal-risco-fechar').addEventListener('click', closeModal);
-    modal.querySelector('#btn-modal-risco-editar').addEventListener('click', () => {
-      closeModal();
-      abrirModalFormRisco(r);
-    });
-  };
-
-  // Modal Cadastro / Edição de Risco
-  const abrirModalFormRisco = (riscoExistente = null, defaultP = 2, defaultI = 2) => {
+  // Modal de Formulário de Cadastro / Edição de Risco
+  const abrirModalFormRisco = (riscoExistente = null, initialP = 2, initialI = 2) => {
     const isEdicao = !!riscoExistente;
-    const areasDisponiveis = getAreasRiscos();
+    const areasParaRiscos = getAreasRiscos();
 
-    const pAtual = riscoExistente ? riscoExistente.probabilidade : defaultP;
-    const iAtual = riscoExistente ? riscoExistente.impacto : defaultI;
+    const pAtual = isEdicao ? riscoExistente.probabilidade : initialP;
+    const iAtual = isEdicao ? riscoExistente.impacto : initialI;
 
     const content = `
-      <form id="form-cad-risco" style="display: flex; flex-direction: column; gap: 16px;">
+      <form id="form-risco-modal" style="display: flex; flex-direction: column; gap: 16px;">
         <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="form-risco-titulo">Título do Risco <span class="required">*</span></label>
-          <input type="text" id="form-risco-titulo" class="form-input" value="${riscoExistente?.titulo || ''}" required placeholder="Ex: Incompatibilidade no esquema de dados da API">
+          <label class="form-label" for="mr-modal-titulo">Título do Risco <span class="required">*</span></label>
+          <input type="text" id="mr-modal-titulo" class="form-input" required 
+            value="${riscoExistente?.titulo || ''}" 
+            placeholder="Ex: Atraso na liberação de portas de firewall pelo parceiro externo">
+          <span class="form-hint">Identificação breve e clara do evento de risco.</span>
         </div>
 
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="form-risco-area">Área Responsável <span class="required">*</span></label>
-          <select id="form-risco-area" class="form-select" required>
-            ${areasDisponiveis.map(a => `
-              <option value="${a}" ${a === (riscoExistente?.areaResponsavel || 'DIST - Divisão de Integração Setorial') ? 'selected' : ''}>${a}</option>
-            `).join('')}
-          </select>
-        </div>
-
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="form-risco-desc">Descrição Detalhada do Risco</label>
-          <textarea id="form-risco-desc" class="form-textarea" rows="3" placeholder="Contextualize os fatores de risco, gatilhos e possíveis consequências...">${riscoExistente?.descricao || ''}</textarea>
-        </div>
-
-        <!-- Seleção de Probabilidade e Impacto -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
           <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="form-risco-p">Probabilidade (1 a 3) <span class="required">*</span></label>
-            <select id="form-risco-p" class="form-select">
-              <option value="1" ${pAtual === 1 ? 'selected' : ''}>1 - Baixa (Raro acontecer)</option>
-              <option value="2" ${pAtual === 2 ? 'selected' : ''}>2 - Média (Pode ocorrer)</option>
-              <option value="3" ${pAtual === 3 ? 'selected' : ''}>3 - Alta (Frequente / Muito provável)</option>
+            <label class="form-label" for="mr-modal-area">Área Responsável <span class="required">*</span></label>
+            <select id="mr-modal-area" class="form-select" required>
+              ${areasParaRiscos.map(a => `
+                <option value="${a}" ${a === (riscoExistente?.areaResponsavel || 'DIST - Divisão de Integração Setorial') ? 'selected' : ''}>${a}</option>
+              `).join('')}
             </select>
           </div>
 
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="form-risco-i">Impacto (1 a 3) <span class="required">*</span></label>
-            <select id="form-risco-i" class="form-select">
-              <option value="1" ${iAtual === 1 ? 'selected' : ''}>1 - Baixo (Impacto desprezível)</option>
-              <option value="2" ${iAtual === 2 ? 'selected' : ''}>2 - Médio (Atrasos recuperáveis)</option>
-              <option value="3" ${iAtual === 3 ? 'selected' : ''}>3 - Alto (Compromete entregas/escopo)</option>
-            </select>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="mr-modal-p">Probabilidade (1 a 3)</label>
+              <select id="mr-modal-p" class="form-select">
+                <option value="1" ${pAtual === 1 ? 'selected' : ''}>1 — Baixa</option>
+                <option value="2" ${pAtual === 2 ? 'selected' : ''}>2 — Média</option>
+                <option value="3" ${pAtual === 3 ? 'selected' : ''}>3 — Alta</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="mr-modal-i">Impacto (1 a 3)</label>
+              <select id="mr-modal-i" class="form-select">
+                <option value="1" ${iAtual === 1 ? 'selected' : ''}>1 — Baixo</option>
+                <option value="2" ${iAtual === 2 ? 'selected' : ''}>2 — Médio</option>
+                <option value="3" ${iAtual === 3 ? 'selected' : ''}>3 — Alto</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <!-- Preview Dinâmico do Cálculo de Classificação -->
-        <div id="preview-score-box" style="padding: 12px 16px; border-radius: var(--radius-button); background: var(--bg-hover); display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color);">
-          <span style="font-size: 12.5px; font-weight: var(--font-weight-semibold);">Pontuação Calculada:</span>
-          <span id="preview-score-badge" class="badge">...</span>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="mr-modal-desc">Descrição do Risco & Medidas Mitigadoras</label>
+          <textarea id="mr-modal-desc" class="form-textarea" rows="3" placeholder="Explique as causas raízes, consequências esperadas e plano de mitigação...">${riscoExistente?.descricao || ''}</textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-hover); padding: 12px 14px; border-radius: var(--radius-button); border: 1px solid var(--border-color);">
+          <span style="font-size: 12.5px; font-weight: var(--font-weight-semibold);">Classificação Calculada:</span>
+          <span id="mr-modal-preview-badge" class="badge">Calculando...</span>
         </div>
       </form>
     `;
 
     const footerHtml = `
-      <button type="button" class="btn btn-secondary" id="btn-cancel-risco">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="btn-salvar-risco">
-        <span class="material-symbols-outlined">save</span> ${isEdicao ? 'Salvar Risco' : 'Cadastrar Risco'}
+      <button type="button" class="btn btn-secondary" id="btn-modal-risco-cancelar">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btn-modal-risco-salvar">
+        <span class="material-symbols-outlined">save</span> ${isEdicao ? 'Atualizar Risco' : 'Salvar Risco'}
       </button>
     `;
 
     const modal = openModal({
-      title: isEdicao ? `Editar Risco #${riscoExistente.numero}` : 'Cadastrar Risco no Projeto',
+      title: isEdicao ? `Editar Risco #${riscoExistente.numero}` : 'Mapear Novo Risco na Matriz 3x3',
       content,
       footerHtml,
-      maxWidth: '600px'
+      maxWidth: '560px'
     });
 
-    const pSelect = modal.querySelector('#form-risco-p');
-    const iSelect = modal.querySelector('#form-risco-i');
-    const badgeScore = modal.querySelector('#preview-score-badge');
+    const pSelect = modal.querySelector('#mr-modal-p');
+    const iSelect = modal.querySelector('#mr-modal-i');
+    const previewBadge = modal.querySelector('#mr-modal-preview-badge');
 
     const updatePreview = () => {
       const p = parseInt(pSelect.value, 10);
       const i = parseInt(iSelect.value, 10);
       const { pontuacao, classificacao } = calcularClassificacaoRisco(p, i);
-
       const badgeClass = classificacao === 'Alto' ? 'badge-danger' : (classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
-      badgeScore.className = `badge ${badgeClass}`;
-      badgeScore.textContent = `${p} × ${i} = ${pontuacao} pts (${classificacao})`;
+      previewBadge.className = `badge ${badgeClass}`;
+      previewBadge.textContent = `${p} × ${i} = ${pontuacao} pts (${classificacao})`;
     };
 
     pSelect.addEventListener('change', updatePreview);
     iSelect.addEventListener('change', updatePreview);
     updatePreview();
 
-    modal.querySelector('#btn-cancel-risco').addEventListener('click', closeModal);
+    modal.querySelector('#btn-modal-risco-cancelar').addEventListener('click', closeModal);
 
-    modal.querySelector('#btn-salvar-risco').addEventListener('click', async () => {
-      const titulo = modal.querySelector('#form-risco-titulo').value.trim();
+    modal.querySelector('#btn-modal-risco-salvar').addEventListener('click', async () => {
+      const titulo = modal.querySelector('#mr-modal-titulo').value.trim();
       if (!titulo) {
         showToast('O título do risco é obrigatório.', 'warning');
         return;
       }
 
-      const areaResponsavel = modal.querySelector('#form-risco-area').value;
-      const descricao = modal.querySelector('#form-risco-desc').value.trim();
+      const areaResponsavel = modal.querySelector('#mr-modal-area').value;
+      const descricao = modal.querySelector('#mr-modal-desc').value.trim();
       const p = parseInt(pSelect.value, 10);
       const i = parseInt(iSelect.value, 10);
 
-      const { currentUser } = getState();
-
       try {
+        const { currentUser } = getState();
         const payload = {
-          ...(riscoExistente || {}),
-          projetoId: activeProject.id,
+          projetoId: projeto.id,
           titulo,
           areaResponsavel,
           descricao,
@@ -558,24 +555,30 @@ export async function renderMatrizRiscos(container) {
           impacto: i
         };
 
-        const salvo = await RiscosService.salvarRisco(payload, currentUser);
-        closeModal();
-        showToast(`Risco #${salvo.numero} salvo com sucesso!`, 'success');
+        if (isEdicao) {
+          await RiscosService.atualizarRisco(riscoExistente.id, payload, currentUser);
+          showToast(`Risco #${riscoExistente.numero} atualizado com sucesso!`, 'success');
+        } else {
+          const criado = await RiscosService.salvarRisco(payload, currentUser);
+          showToast(`Risco #${criado.numero} catalogado com sucesso!`, 'success');
+        }
 
+        closeModal();
         riscos = await RiscosService.listarPorProjeto(activeProject.id);
         renderGridMatriz();
         renderTabelaRiscos();
       } catch (err) {
-        showToast(err.message, 'danger');
+        showToast(`Erro ao salvar risco: ${err.message}`, 'danger');
       }
     });
   };
 
-  container.querySelector('#btn-cadastrar-risco').addEventListener('click', () => {
-    abrirModalFormRisco(null);
+  // Botão Mapear Novo Risco no Topo
+  container.querySelector('#btn-cadastrar-risco')?.addEventListener('click', () => {
+    abrirModalFormRisco();
   });
 
-  // Render inicial
+  // Render inicial da Matriz e Tabela
   renderGridMatriz();
   renderTabelaRiscos();
 }
