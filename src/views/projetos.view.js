@@ -1,9 +1,9 @@
 /**
  * View: Gestão de Projetos Interinstitucionais
- * Tabela, busca, filtros, modal de detalhes e formulário de cadastro/edição
+ * Tabela, busca, filtros, modal de detalhes, exclusão para Admin e formulário de cadastro/edição
  */
-import { ProjetosService } from '../services/projetos.service.js';
-import { getState, setActiveProject, setActiveTab, canConfigureDist, canEdit } from '../store/state.js';
+import { ProjetosService, formatarDataOuPeriodo } from '../services/projetos.service.js';
+import { getState, setActiveProject, setActiveTab, canConfigureDist, canEdit, isAdmin } from '../store/state.js';
 import { openModal, closeModal } from '../components/modal.component.js';
 import { showToast } from '../components/toast.component.js';
 import { getAreasInstitucionais } from '../config/areas-institucionais.js';
@@ -11,6 +11,9 @@ import { guardedNavigate } from '../components/dirty-guard.js';
 import { renderMultiselectDropdown } from '../components/multiselect-dropdown.component.js';
 
 export async function renderProjetos(container) {
+  const podeEditar = canEdit();
+  const administrador = isAdmin();
+
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
       <div>
@@ -19,9 +22,11 @@ export async function renderProjetos(container) {
       </div>
 
       <div style="display: flex; gap: 10px;">
-        <button type="button" class="btn btn-primary" id="btn-abrir-novo-projeto">
-          <span class="material-symbols-outlined">add</span> Novo Projeto
-        </button>
+        ${podeEditar ? `
+          <button type="button" class="btn btn-primary" id="btn-abrir-novo-projeto">
+            <span class="material-symbols-outlined">add</span> Novo Projeto
+          </button>
+        ` : ''}
       </div>
     </div>
 
@@ -52,7 +57,7 @@ export async function renderProjetos(container) {
             <th>Área Gestora</th>
             <th>Entes Externos</th>
             <th>Módulo DIST</th>
-            <th>Período</th>
+            <th>Vigência / Cronograma</th>
             <th style="text-align: right;">Ações</th>
           </tr>
         </thead>
@@ -78,15 +83,21 @@ export async function renderProjetos(container) {
       const isAtivo = p.id === activeProjectId;
       const entesTexto = Array.isArray(p.entesExternos) ? p.entesExternos.join(', ') : (p.entesExternos || 'Nenhum');
 
+      const inicioObj = formatarDataOuPeriodo(p.dataInicio);
+      const fimObj = formatarDataOuPeriodo(p.previsaoEncerramento);
+
+      const inicioHtml = `${inicioObj.texto}${inicioObj.isPrevisao && inicioObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size:9px; padding: 1px 4px;">Previsão</span>' : ''}`;
+      const fimHtml = `${fimObj.texto}${fimObj.isPrevisao && fimObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size:9px; padding: 1px 4px;">Previsão</span>' : ''}`;
+
       return `
-        <tr class="${isAtivo ? 'row-active' : ''}">
+        <tr class="${isAtivo ? 'row-active' : ''}" data-row-id="${p.id}" style="cursor: pointer;" title="Clique na linha para expandir detalhes">
           <td>
             <div style="font-weight: var(--font-weight-bold); color: var(--text-main); font-size: 13.5px;">
               ${p.nome}
               ${isAtivo ? '<span class="badge badge-primary" style="margin-left: 6px; font-size: 10px;">Ativo</span>' : ''}
             </div>
             <div style="font-size: 11.5px; color: var(--text-muted); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${p.objetivo || 'Sem objetivo informado'}
+              ${p.descricao || p.objetivo || 'Sem descrição informada'}
             </div>
           </td>
           <td><span class="tag">${p.areaGestora || 'DSV'}</span></td>
@@ -97,8 +108,7 @@ export async function renderProjetos(container) {
             </span>
           </td>
           <td style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">
-            ${p.dataInicio ? new Date(p.dataInicio).toLocaleDateString('pt-BR') : '—'} até 
-            ${p.previsaoEncerramento ? new Date(p.previsaoEncerramento).toLocaleDateString('pt-BR') : '—'}
+            ${inicioHtml} <span style="color: var(--text-muted);">até</span> ${fimHtml}
           </td>
           <td style="text-align: right; white-space: nowrap;">
             <button type="button" class="btn btn-secondary btn-sm btn-detalhes-projeto" data-id="${p.id}" title="Expandir detalhes completos">
@@ -107,17 +117,35 @@ export async function renderProjetos(container) {
             <button type="button" class="btn ${isAtivo ? 'btn-primary' : 'btn-outline'} btn-sm btn-selecionar-projeto" data-id="${p.id}" title="Tornar este projeto ativo na navegação">
               <span>${isAtivo ? 'Selecionado' : 'Selecionar'}</span>
             </button>
-            <button type="button" class="btn btn-secondary btn-sm btn-editar-projeto" data-id="${p.id}" title="Editar projeto">
-              <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
-            </button>
+            ${podeEditar ? `
+              <button type="button" class="btn btn-secondary btn-sm btn-editar-projeto" data-id="${p.id}" title="Editar projeto">
+                <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
+              </button>
+            ` : ''}
+            ${administrador ? `
+              <button type="button" class="btn btn-secondary btn-sm btn-excluir-projeto" data-id="${p.id}" title="Excluir projeto do sistema" style="color: var(--color-danger); margin-left: 4px;">
+                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+              </button>
+            ` : ''}
           </td>
         </tr>
       `;
     }).join('');
 
-    // Listener Detalhes (Modal expandindo)
+    // Listener clique na linha da tabela para abrir modal de detalhes
+    tbody.querySelectorAll('tr[data-row-id]').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const id = row.getAttribute('data-row-id');
+        const proj = todosProjetos.find(p => p.id === id);
+        if (proj) abrirModalDetalhes(proj);
+      });
+    });
+
+    // Listener Detalhes
     tbody.querySelectorAll('.btn-detalhes-projeto').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = btn.getAttribute('data-id');
         const proj = todosProjetos.find(p => p.id === id);
         if (proj) abrirModalDetalhes(proj);
@@ -126,7 +154,8 @@ export async function renderProjetos(container) {
 
     // Listener Selecionar
     tbody.querySelectorAll('.btn-selecionar-projeto').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = btn.getAttribute('data-id');
         const proj = todosProjetos.find(p => p.id === id);
         if (proj) {
@@ -141,10 +170,38 @@ export async function renderProjetos(container) {
 
     // Listener Editar
     tbody.querySelectorAll('.btn-editar-projeto').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = btn.getAttribute('data-id');
         const proj = todosProjetos.find(p => p.id === id);
         if (proj) abrirModalFormulario(proj);
+      });
+    });
+
+    // Listener Excluir (Administrador)
+    tbody.querySelectorAll('.btn-excluir-projeto').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const proj = todosProjetos.find(p => p.id === id);
+        if (!proj) return;
+
+        if (confirm(`Atenção: Deseja realmente remover o projeto "${proj.nome}"? Esta operação é restrita ao perfil Administrador.`)) {
+          try {
+            const { currentUser, activeProjectId } = getState();
+            await ProjetosService.excluirProjeto(id, currentUser);
+            showToast(`Projeto "${proj.nome}" excluído com sucesso.`, 'info');
+
+            if (activeProjectId === id) {
+              setActiveProject(null);
+            }
+
+            todosProjetos = await ProjetosService.listarProjetos();
+            renderTabela(filtrarProjetos());
+          } catch (err) {
+            showToast(`Erro ao excluir: ${err.message}`, 'danger');
+          }
+        }
       });
     });
   };
@@ -156,6 +213,7 @@ export async function renderProjetos(container) {
     return todosProjetos.filter(p => {
       const matchTermo = !termo || 
         p.nome?.toLowerCase().includes(termo) ||
+        p.descricao?.toLowerCase().includes(termo) ||
         p.objetivo?.toLowerCase().includes(termo) ||
         (Array.isArray(p.entesExternos) && p.entesExternos.some(e => e.toLowerCase().includes(termo)));
 
@@ -176,7 +234,7 @@ export async function renderProjetos(container) {
     renderTabela(filtrarProjetos());
   });
 
-  // Modal de Detalhes Expandidos (Requisito: nome, área gestora, entes externos e áreas envolvidas)
+  // Modal de Detalhes Expandidos
   const abrirModalDetalhes = (proj) => {
     const areas = Array.isArray(proj.areasDetranEnvolvidas) && proj.areasDetranEnvolvidas.length > 0
       ? proj.areasDetranEnvolvidas.map(a => `<span class="tag" style="margin-right: 4px; margin-bottom: 4px;">${a}</span>`).join('')
@@ -186,15 +244,24 @@ export async function renderProjetos(container) {
       ? proj.entesExternos.map(e => `<span class="tag" style="margin-right: 4px; margin-bottom: 4px;">${e}</span>`).join('')
       : '<span style="color: var(--text-muted);">Nenhum ente informado</span>';
 
+    const inicioObj = formatarDataOuPeriodo(proj.dataInicio);
+    const fimObj = formatarDataOuPeriodo(proj.previsaoEncerramento);
+
+    const inicioHtml = `${inicioObj.texto}${inicioObj.isPrevisao && inicioObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; margin-left: 4px;">Previsão</span>' : ''}`;
+    const fimHtml = `${fimObj.texto}${fimObj.isPrevisao && fimObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; margin-left: 4px;">Previsão</span>' : ''}`;
+
     const content = `
       <div style="display: flex; flex-direction: column; gap: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color-light); padding-bottom: 12px;">
-          <div>
-            <span class="badge ${proj.distHabilitado ? 'badge-success' : 'badge-neutral'}">
-              ${proj.distHabilitado ? 'Módulo DIST Habilitado' : 'Módulo DIST Desabilitado'}
-            </span>
-          </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color-light); padding-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <span class="badge ${proj.distHabilitado ? 'badge-success' : 'badge-neutral'}">
+            ${proj.distHabilitado ? 'Módulo DIST Habilitado' : 'Módulo DIST Desabilitado'}
+          </span>
           <span style="font-size: 12px; color: var(--text-muted);">Área Gestora: <strong>${proj.areaGestora || 'DSV'}</strong></span>
+        </div>
+
+        <div>
+          <h4 style="font-size: 12px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Descrição</h4>
+          <p style="font-size: 13.5px; line-height: 1.5; color: var(--text-main);">${proj.descricao || 'Não informada'}</p>
         </div>
 
         <div>
@@ -219,8 +286,8 @@ export async function renderProjetos(container) {
         </div>
 
         <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border-color-light); padding-top: 12px;">
-          <span>Início: <strong>${proj.dataInicio || '—'}</strong></span>
-          <span>Previsão de Fim: <strong>${proj.previsaoEncerramento || '—'}</strong></span>
+          <span>Início: <strong>${inicioHtml}</strong></span>
+          <span>Previsão de Fim: <strong>${fimHtml}</strong></span>
         </div>
       </div>
     `;
@@ -270,6 +337,11 @@ export async function renderProjetos(container) {
           <input type="text" id="form-nome" class="form-input" value="${projetoExistente?.nome || ''}" required placeholder="Ex: Modernização do Sistema X">
         </div>
 
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="form-descricao">Descrição Resumida</label>
+          <textarea id="form-descricao" class="form-textarea" rows="2" placeholder="Síntese da proposta institucional e contexto...">${projetoExistente?.descricao || ''}</textarea>
+        </div>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="form-area-gestora">Área Gestora <span class="required">*</span></label>
@@ -281,15 +353,15 @@ export async function renderProjetos(container) {
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="form-data-inicio">Data de Início</label>
-            <input type="date" id="form-data-inicio" class="form-input" value="${projetoExistente?.dataInicio || ''}">
+            <label class="form-label" for="form-data-inicio">Data / Período de Início</label>
+            <input type="text" id="form-data-inicio" class="form-input" value="${projetoExistente?.dataInicio || ''}" placeholder="Ex: 2026-02-01 ou 1º sem/2026">
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="form-previsao-fim">Previsão de Encerramento</label>
-            <input type="date" id="form-previsao-fim" class="form-input" value="${projetoExistente?.previsaoEncerramento || ''}">
+            <input type="text" id="form-previsao-fim" class="form-input" value="${projetoExistente?.previsaoEncerramento || ''}" placeholder="Ex: 2026-12-15 ou Dez/2026">
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
@@ -367,8 +439,17 @@ export async function renderProjetos(container) {
       }
 
       const areaGestora = modal.querySelector('#form-area-gestora').value;
-      const dataInicio = modal.querySelector('#form-data-inicio').value;
-      const previsaoEncerramento = modal.querySelector('#form-previsao-fim').value;
+      const descricao = modal.querySelector('#form-descricao').value.trim();
+      const dataInicio = modal.querySelector('#form-data-inicio').value.trim();
+      const previsaoEncerramento = modal.querySelector('#form-previsao-fim').value.trim();
+
+      try {
+        ProjetosService.validarDatas(dataInicio, previsaoEncerramento);
+      } catch (errData) {
+        showToast(errData.message, 'warning');
+        return;
+      }
+
       const entesRaw = modal.querySelector('#form-entes-externos').value;
       const entesExternos = entesRaw ? entesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
@@ -378,7 +459,7 @@ export async function renderProjetos(container) {
       const escopo = modal.querySelector('#form-escopo').value.trim();
       
       const distCheckbox = modal.querySelector('#form-dist-habilitado');
-      const distHabilitado = distCheckbox.checked;
+      const distHabilitado = distCheckbox ? distCheckbox.checked : true;
 
       const { currentUser } = getState();
 
@@ -386,6 +467,7 @@ export async function renderProjetos(container) {
         const payload = {
           ...(projetoExistente || {}),
           nome,
+          descricao,
           areaGestora,
           dataInicio,
           previsaoEncerramento,
@@ -415,7 +497,7 @@ export async function renderProjetos(container) {
   };
 
   // Botão Abrir Novo Projeto
-  container.querySelector('#btn-abrir-novo-projeto').addEventListener('click', () => {
+  container.querySelector('#btn-abrir-novo-projeto')?.addEventListener('click', () => {
     abrirModalFormulario(null);
   });
 

@@ -13,6 +13,7 @@ import { renderProjectContextCard, attachProjectContextCardEvents } from '../com
 
 export async function renderMatrizRiscos(container) {
   const { activeProject } = getState();
+  const podeEditar = canEdit();
 
   if (!activeProject) {
     container.innerHTML = `
@@ -48,11 +49,11 @@ export async function renderMatrizRiscos(container) {
   container.innerHTML = `
     <!-- Card Unificado de Contexto do Projeto Ativo -->
     ${renderProjectContextCard(projeto, {
-      extraBadgesHtml: `
+      extraBadgesHtml: podeEditar ? `
         <button type="button" class="btn btn-primary btn-sm" id="btn-cadastrar-risco">
           <span class="material-symbols-outlined">add_alert</span> Mapear Novo Risco
         </button>
-      `
+      ` : ''
     })}
 
     <!-- Metodologia e Escalas (Acordeão Recolhível Clean) -->
@@ -224,7 +225,7 @@ export async function renderMatrizRiscos(container) {
             } else {
               abrirModalMultiplosRiscos(riscosNaCelula, pObj.valor, iObj.valor, classificacao);
             }
-          } else {
+          } else if (podeEditar) {
             // Atalho para cadastrar risco com esta probabilidade e impacto já pré-selecionados
             abrirModalFormRisco(null, pObj.valor, iObj.valor);
           }
@@ -232,6 +233,18 @@ export async function renderMatrizRiscos(container) {
 
         grid.appendChild(cell);
       });
+    });
+
+    // Linha inferior: canto vazio + rótulos das 3 colunas de Impacto (Eixo X)
+    const corner = document.createElement('div');
+    corner.className = 'axis-corner-empty';
+    grid.appendChild(corner);
+
+    impactos.forEach(iObj => {
+      const colHeader = document.createElement('div');
+      colHeader.className = 'axis-col-header';
+      colHeader.textContent = iObj.label;
+      grid.appendChild(colHeader);
     });
   };
 
@@ -276,16 +289,31 @@ export async function renderMatrizRiscos(container) {
             <span class="badge ${badgeClass}">${classificacao}</span>
           </td>
           <td style="text-align: right; white-space: nowrap;">
-            <button type="button" class="btn btn-secondary btn-sm btn-editar-risco" data-id="${r.id}" title="Editar Risco">
-              <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm btn-excluir-risco" data-id="${r.id}" title="Excluir Risco" style="color: var(--color-danger); margin-left: 4px;">
-              <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
-            </button>
+            ${podeEditar ? `
+              <button type="button" class="btn btn-secondary btn-sm btn-editar-risco" data-id="${r.id}" title="Editar Risco">
+                <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm btn-excluir-risco" data-id="${r.id}" title="Excluir Risco" style="color: var(--color-danger); margin-left: 4px;">
+                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+              </button>
+            ` : `
+              <button type="button" class="btn btn-secondary btn-sm btn-ver-risco-tab" data-id="${r.id}" title="Ver Detalhes">
+                <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
+              </button>
+            `}
           </td>
         </tr>
       `;
     }).join('');
+
+    // Listeners Ver
+    tbody.querySelectorAll('.btn-ver-risco-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const risco = riscos.find(x => x.id === id);
+        if (risco) abrirModalDetalhesRisco(risco);
+      });
+    });
 
     // Listeners Editar
     tbody.querySelectorAll('.btn-editar-risco').forEach(btn => {
@@ -359,9 +387,11 @@ export async function renderMatrizRiscos(container) {
 
     const footerHtml = `
       <button type="button" class="btn btn-secondary" id="btn-modal-fechar">Fechar</button>
-      <button type="button" class="btn btn-primary" id="btn-modal-editar-direto">
-        <span class="material-symbols-outlined">edit</span> Editar Risco
-      </button>
+      ${podeEditar ? `
+        <button type="button" class="btn btn-primary" id="btn-modal-editar-direto">
+          <span class="material-symbols-outlined">edit</span> Editar Risco
+        </button>
+      ` : ''}
     `;
 
     const modal = openModal({
@@ -372,7 +402,7 @@ export async function renderMatrizRiscos(container) {
     });
 
     modal.querySelector('#btn-modal-fechar').addEventListener('click', closeModal);
-    modal.querySelector('#btn-modal-editar-direto').addEventListener('click', () => {
+    modal.querySelector('#btn-modal-editar-direto')?.addEventListener('click', () => {
       closeModal();
       abrirModalFormRisco(risco);
     });
@@ -408,9 +438,11 @@ export async function renderMatrizRiscos(container) {
 
     const footerHtml = `
       <button type="button" class="btn btn-secondary" id="btn-multi-fechar">Fechar</button>
-      <button type="button" class="btn btn-primary" id="btn-multi-novo">
-        <span class="material-symbols-outlined">add</span> Adicionar Mais um Risco nesta Célula
-      </button>
+      ${podeEditar ? `
+        <button type="button" class="btn btn-primary" id="btn-multi-novo">
+          <span class="material-symbols-outlined">add</span> Adicionar Mais um Risco nesta Célula
+        </button>
+      ` : ''}
     `;
 
     const modal = openModal({
@@ -421,7 +453,7 @@ export async function renderMatrizRiscos(container) {
     });
 
     modal.querySelector('#btn-multi-fechar').addEventListener('click', closeModal);
-    modal.querySelector('#btn-multi-novo').addEventListener('click', () => {
+    modal.querySelector('#btn-multi-novo')?.addEventListener('click', () => {
       closeModal();
       abrirModalFormRisco(null, p, i);
     });
@@ -556,7 +588,11 @@ export async function renderMatrizRiscos(container) {
         };
 
         if (isEdicao) {
-          await RiscosService.atualizarRisco(riscoExistente.id, payload, currentUser);
+          await RiscosService.atualizarRisco(riscoExistente.id, {
+            ...payload,
+            id: riscoExistente.id,
+            numero: riscoExistente.numero
+          }, currentUser);
           showToast(`Risco #${riscoExistente.numero} atualizado com sucesso!`, 'success');
         } else {
           const criado = await RiscosService.salvarRisco(payload, currentUser);

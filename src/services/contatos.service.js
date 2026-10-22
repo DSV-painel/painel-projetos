@@ -11,6 +11,33 @@ const COLLECTION = 'contatos';
 // Regex para validação estrita de e-mail institucional
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * Normaliza campos de contatos da base central do CRM (/contatos)
+ * Suporta nome/Nome, email/email_institucional, cargo/funcao, area/setor/entidade e projetosIds
+ */
+export function normalizarContato(c) {
+  if (!c) return null;
+  const nome = c.nome || c.Nome || 'Sem nome';
+  const email = (c.email || c.email_institucional || c.Email || '').trim().toLowerCase();
+  const cargo = c.cargo || c.Cargo || c.funcao || '';
+  const area = c.area || c.setor || c.Setor || c.entidade || c.orgao || '';
+  const telefone = c.telefone || c.celular || c.Telefone || '';
+  const projetosIds = Array.isArray(c.projetosIds)
+    ? c.projetosIds
+    : (c.projetoId ? [c.projetoId] : []);
+
+  return {
+    ...c,
+    nome,
+    email,
+    cargo,
+    area,
+    telefone,
+    projetoId: c.projetoId || (projetosIds.length > 0 ? projetosIds[0] : null),
+    projetosIds
+  };
+}
+
 export const ContatosService = {
   /**
    * Valida formato de e-mail
@@ -28,7 +55,10 @@ export const ContatosService = {
    */
   async listarTodos() {
     const contatos = await StorageAdapter.getAll(COLLECTION);
-    return contatos.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    return contatos
+      .map(normalizarContato)
+      .filter(Boolean)
+      .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
   },
 
   /**
@@ -38,8 +68,11 @@ export const ContatosService = {
    */
   async listarPorProjeto(projetoId) {
     if (!projetoId) return [];
-    const contatos = await StorageAdapter.getByProjetoId(COLLECTION, projetoId);
-    return contatos.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    const todos = await this.listarTodos();
+    return todos.filter(c => 
+      c.projetoId === projetoId || 
+      (Array.isArray(c.projetosIds) && c.projetosIds.includes(projetoId))
+    );
   },
 
   /**
@@ -49,7 +82,59 @@ export const ContatosService = {
    */
   async obterPorId(id) {
     if (!id) return null;
-    return await StorageAdapter.getById(COLLECTION, id);
+    const contato = await StorageAdapter.getById(COLLECTION, id);
+    return normalizarContato(contato);
+  },
+
+  /**
+   * Vincula um contato existente da base CRM a um projeto
+   * @param {string} contatoId 
+   * @param {string} projetoId 
+   * @param {Object} usuario 
+   * @returns {Promise<Object>}
+   */
+  async vincularContatoExistente(contatoId, projetoId, usuario) {
+    if (!contatoId || !projetoId) {
+      throw new Error('ID do contato e ID do projeto são obrigatórios para vincular.');
+    }
+    const contato = await this.obterPorId(contatoId);
+    if (!contato) {
+      throw new Error('Contato não encontrado na base central.');
+    }
+
+    const contatosProjeto = await this.listarPorProjeto(projetoId);
+    const duplicado = contatosProjeto.find(c => 
+      c.email?.toLowerCase() === contato.email?.toLowerCase() && c.id !== contatoId
+    );
+    if (duplicado) {
+      throw new Error(`O e-mail "${contato.email}" já está cadastrado para o contato "${duplicado.nome}" neste projeto.`);
+    }
+
+    const novosProjetosIds = Array.from(new Set([...contato.projetosIds, projetoId]));
+    const now = new Date().toISOString();
+    const payload = {
+      ...contato,
+      projetoId: contato.projetoId || projetoId,
+      projetosIds: novosProjetosIds,
+      atualizadoEm: now,
+      atualizadoPor: {
+        uid: usuario?.uid || 'anonimo',
+        nome: usuario?.nome || 'Usuário'
+      }
+    };
+
+    const salvo = await StorageAdapter.save(COLLECTION, payload);
+
+    await AuditService.registrarLog({
+      usuario,
+      acao: 'EDITAR_CONTATO',
+      entidade: 'contato',
+      entidadeId: salvo.id,
+      projetoId,
+      detalhes: `Contato "${salvo.nome}" (${salvo.email}) vinculado ao projeto a partir da base CRM.`
+    });
+
+    return normalizarContato(salvo);
   },
 
   /**
@@ -59,16 +144,16 @@ export const ContatosService = {
    * @returns {Promise<Object>}
    */
   async salvarContato(dadosContato, usuario) {
-    if (!dadosContato.projetoId) {
+    if (!dadosContato.projetoId && (!dadosContato.projetosIds || dadosContato.projetosIds.length === 0)) {
       throw new Error('Identificador do projeto é obrigatório para cadastrar contato.');
     }
 
-    const nome = dadosContato.nome?.trim();
+    const nome = (dadosContato.nome || dadosContato.Nome)?.trim();
     if (!nome) {
       throw new Error('O nome do contato é obrigatório.');
     }
 
-    const email = dadosContato.email?.trim().toLowerCase();
+    const email = (dadosContato.email || dadosContato.email_institucional || dadosContato.Email)?.trim().toLowerCase();
     if (!email) {
       throw new Error('O e-mail institucional é obrigatório.');
     }
@@ -77,8 +162,10 @@ export const ContatosService = {
       throw new Error('Formato de e-mail inválido. Utilize um endereço válido como nome@detran.sp.gov.br.');
     }
 
+    const projId = dadosContato.projetoId || (Array.isArray(dadosContato.projetosIds) ? dadosContato.projetosIds[0] : null);
+
     // Regra: Alertar quando o mesmo e-mail já estiver associado ao projeto
-    const contatosProjeto = await this.listarPorProjeto(dadosContato.projetoId);
+    const contatosProjeto = await this.listarPorProjeto(projId);
     const duplicado = contatosProjeto.find(c => 
       c.email?.toLowerCase() === email && c.id !== dadosContato.id
     );
@@ -90,12 +177,19 @@ export const ContatosService = {
     const isNovo = !dadosContato.id;
     const now = new Date().toISOString();
 
+    const projetosIds = Array.isArray(dadosContato.projetosIds) && dadosContato.projetosIds.length > 0
+      ? Array.from(new Set([...dadosContato.projetosIds, projId].filter(Boolean)))
+      : (projId ? [projId] : []);
+
     const payload = {
       ...dadosContato,
       nome,
       email,
-      cargo: dadosContato.cargo?.trim() || '',
-      area: dadosContato.area?.trim() || '',
+      cargo: (dadosContato.cargo || dadosContato.Cargo || dadosContato.funcao || '').trim(),
+      area: (dadosContato.area || dadosContato.setor || dadosContato.Setor || dadosContato.entidade || dadosContato.orgao || '').trim(),
+      telefone: (dadosContato.telefone || dadosContato.celular || dadosContato.Telefone || '').trim(),
+      projetoId: projId,
+      projetosIds,
       atualizadoEm: now,
       atualizadoPor: {
         uid: usuario?.uid || 'anonimo',
@@ -115,22 +209,62 @@ export const ContatosService = {
       acao: isNovo ? 'CRIAR_CONTATO' : 'EDITAR_CONTATO',
       entidade: 'contato',
       entidadeId: salvo.id,
-      projetoId: salvo.projetoId,
+      projetoId: projId,
       detalhes: `Contato "${salvo.nome}" (${salvo.email}) ${isNovo ? 'cadastrado' : 'atualizado'} no projeto.`
     });
 
-    return salvo;
+    return normalizarContato(salvo);
   },
 
   /**
-   * Remove o vínculo de um contato do projeto
+   * Alias para criar contato delegando para salvarContato
+   */
+  async criarContato(dadosContato, usuario) {
+    return await this.salvarContato(dadosContato, usuario);
+  },
+
+  /**
+   * Alias para atualizar contato delegando para salvarContato
+   */
+  async atualizarContato(id, dadosContato, usuario) {
+    return await this.salvarContato({ ...dadosContato, id }, usuario);
+  },
+
+  /**
+   * Remove o vínculo de um contato do projeto ou exclui da base
    * @param {string} id 
    * @param {Object} usuario 
+   * @param {string} [projetoId]
    * @returns {Promise<boolean>}
    */
-  async excluirContato(id, usuario) {
+  async excluirContato(id, usuario, projetoId = null) {
     const contato = await this.obterPorId(id);
     if (!contato) return false;
+
+    if (projetoId && contato.projetosIds && contato.projetosIds.length > 1 && contato.projetosIds.includes(projetoId)) {
+      const novosProjetosIds = contato.projetosIds.filter(pid => pid !== projetoId);
+      const payload = {
+        ...contato,
+        projetosIds: novosProjetosIds,
+        projetoId: novosProjetosIds[0] || null,
+        atualizadoEm: new Date().toISOString(),
+        atualizadoPor: {
+          uid: usuario?.uid || 'anonimo',
+          nome: usuario?.nome || 'Usuário'
+        }
+      };
+      await StorageAdapter.save(COLLECTION, payload);
+
+      await AuditService.registrarLog({
+        usuario,
+        acao: 'EXCLUIR_CONTATO',
+        entidade: 'contato',
+        entidadeId: id,
+        projetoId,
+        detalhes: `Vínculo do contato "${contato.nome}" (${contato.email}) removido deste projeto.`
+      });
+      return true;
+    }
 
     await StorageAdapter.remove(COLLECTION, id);
 
@@ -139,7 +273,7 @@ export const ContatosService = {
       acao: 'EXCLUIR_CONTATO',
       entidade: 'contato',
       entidadeId: id,
-      projetoId: contato.projetoId,
+      projetoId: contato.projetoId || projetoId,
       detalhes: `Contato "${contato.nome}" (${contato.email}) foi removido do projeto.`
     });
 

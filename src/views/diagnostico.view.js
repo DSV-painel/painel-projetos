@@ -3,11 +3,12 @@
  * Conforme Seção 5 do documento de regras de negócio:
  * - Card de Contexto Unificado do Projeto Ativo
  * - Classificação técnica do projeto (5 categorias oficiais)
- * - Situação Atual, Recomendações e Próximos Passos
+ * - Situação Atual, Recomendações e Próximos Passos com validação inline
+ * - Histórico de Evolução do Diagnóstico
  * - Seleção de Áreas Executoras via MultiselectDropdown
- * - Gestão de Riscos Mapeados com modal rápido de catalogação
+ * - Gestão completa de Riscos Mapeados (consultar, editar e excluir)
  */
-import { getState, setActiveTab, setDirty } from '../store/state.js';
+import { getState, setActiveTab, setDirty, canEdit } from '../store/state.js';
 import { DiagnosticosService, LABELS_CLASSIFICACAO_DIAGNOSTICO } from '../services/diagnosticos.service.js';
 import { ProjetosService } from '../services/projetos.service.js';
 import { RiscosService, calcularClassificacaoRisco } from '../services/riscos.service.js';
@@ -20,6 +21,7 @@ import { guardedNavigate } from '../components/dirty-guard.js';
 
 export async function renderDiagnostico(container) {
   const { activeProject } = getState();
+  const podeEditar = canEdit();
 
   if (!activeProject) {
     container.innerHTML = `
@@ -85,9 +87,16 @@ export async function renderDiagnostico(container) {
             </div>
           </div>
         </div>
-        <button type="button" class="btn btn-primary" id="btn-salvar-diagnostico">
-          <span class="material-symbols-outlined">save</span> Gravar Diagnóstico
-        </button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-historico-diagnostico" title="Visualizar histórico de evoluções">
+            <span class="material-symbols-outlined">history</span> Histórico de Evolução
+          </button>
+          ${podeEditar ? `
+            <button type="button" class="btn btn-primary" id="btn-salvar-diagnostico">
+              <span class="material-symbols-outlined">save</span> Gravar Diagnóstico
+            </button>
+          ` : ''}
+        </div>
       </div>
 
       <form id="form-diagnostico" style="display: flex; flex-direction: column; gap: 20px;">
@@ -99,7 +108,7 @@ export async function renderDiagnostico(container) {
             
             <!-- 1. Em estruturação -->
             <label class="diag-option-card ${classificacaoAtual === 'em_estruturacao' ? 'selected-estruturacao' : ''}">
-              <input type="radio" name="diag-classificacao" value="em_estruturacao" ${classificacaoAtual === 'em_estruturacao' ? 'checked' : ''}>
+              <input type="radio" name="diag-classificacao" value="em_estruturacao" ${classificacaoAtual === 'em_estruturacao' ? 'checked' : ''} ${!podeEditar ? 'disabled' : ''}>
               <div>
                 <div style="font-weight: 700; font-size: 12.5px; color: #0284c7;">Em estruturação</div>
                 <div style="font-size: 11px; color: var(--text-muted);">Definição inicial de escopo</div>
@@ -108,7 +117,7 @@ export async function renderDiagnostico(container) {
 
             <!-- 2. Em andamento -->
             <label class="diag-option-card ${classificacaoAtual === 'em_andamento' ? 'selected-andamento' : ''}">
-              <input type="radio" name="diag-classificacao" value="em_andamento" ${classificacaoAtual === 'em_andamento' ? 'checked' : ''}>
+              <input type="radio" name="diag-classificacao" value="em_andamento" ${classificacaoAtual === 'em_andamento' ? 'checked' : ''} ${!podeEditar ? 'disabled' : ''}>
               <div>
                 <div style="font-weight: 700; font-size: 12.5px; color: var(--color-success, #059669);">Em andamento</div>
                 <div style="font-size: 11px; color: var(--text-muted);">Execução dentro do fluxo previsto</div>
@@ -117,7 +126,7 @@ export async function renderDiagnostico(container) {
 
             <!-- 3. Requer atenção -->
             <label class="diag-option-card ${classificacaoAtual === 'requer_atencao' ? 'selected-atencao' : ''}">
-              <input type="radio" name="diag-classificacao" value="requer_atencao" ${classificacaoAtual === 'requer_atencao' ? 'checked' : ''}>
+              <input type="radio" name="diag-classificacao" value="requer_atencao" ${classificacaoAtual === 'requer_atencao' ? 'checked' : ''} ${!podeEditar ? 'disabled' : ''}>
               <div>
                 <div style="font-weight: 700; font-size: 12.5px; color: var(--color-warning, #d97706);">Requer atenção</div>
                 <div style="font-size: 11px; color: var(--text-muted);">Gargalos operacionais identificados</div>
@@ -126,7 +135,7 @@ export async function renderDiagnostico(container) {
 
             <!-- 4. Requer decisão estratégica -->
             <label class="diag-option-card ${classificacaoAtual === 'requer_decisao_estrategica' ? 'selected-decisao' : ''}">
-              <input type="radio" name="diag-classificacao" value="requer_decisao_estrategica" ${classificacaoAtual === 'requer_decisao_estrategica' ? 'checked' : ''}>
+              <input type="radio" name="diag-classificacao" value="requer_decisao_estrategica" ${classificacaoAtual === 'requer_decisao_estrategica' ? 'checked' : ''} ${!podeEditar ? 'disabled' : ''}>
               <div>
                 <div style="font-weight: 700; font-size: 12.5px; color: var(--color-danger, #dc2626);">Decisão estratégica</div>
                 <div style="font-size: 11px; color: var(--text-muted);">Bloqueios e alinhamento superior</div>
@@ -135,7 +144,7 @@ export async function renderDiagnostico(container) {
 
             <!-- 5. Concluído -->
             <label class="diag-option-card ${classificacaoAtual === 'concluido' ? 'selected-concluido' : ''}">
-              <input type="radio" name="diag-classificacao" value="concluido" ${classificacaoAtual === 'concluido' ? 'checked' : ''}>
+              <input type="radio" name="diag-classificacao" value="concluido" ${classificacaoAtual === 'concluido' ? 'checked' : ''} ${!podeEditar ? 'disabled' : ''}>
               <div>
                 <div style="font-weight: 700; font-size: 12.5px; color: #4338ca;">Concluído</div>
                 <div style="font-size: 11px; color: var(--text-muted);">Entregas e encerramento</div>
@@ -150,14 +159,16 @@ export async function renderDiagnostico(container) {
           <!-- Situação Atual -->
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="diag-situacao">Situação Atual <span class="required">*</span></label>
-            <textarea id="diag-situacao" class="form-textarea" rows="4" required placeholder="Descreva o andamento atual, pendências, entregas recentes e contexto da articulação institucional...">${diagnostico?.situacaoAtual || ''}</textarea>
+            <textarea id="diag-situacao" class="form-textarea" rows="4" required placeholder="Descreva o andamento atual, pendências, entregas recentes e contexto da articulação institucional..." ${!podeEditar ? 'disabled' : ''}>${diagnostico?.situacaoAtual || ''}</textarea>
+            <span class="form-error-msg" id="err-diag-situacao" style="display: none;"></span>
             <span class="form-hint">Avaliação qualitativa do cenário operacional e executivo.</span>
           </div>
 
           <!-- Recomendações e Próximos Passos -->
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="diag-recomendacoes">Recomendações e Próximos Passos <span class="required">*</span></label>
-            <textarea id="diag-recomendacoes" class="form-textarea" rows="4" required placeholder="Ações recomendadas pela área de Integração para mitigar problemas e encaminhar as soluções...">${diagnostico?.recomendacoesProximosPassos || ''}</textarea>
+            <textarea id="diag-recomendacoes" class="form-textarea" rows="4" required placeholder="Ações recomendadas pela área de Integração para mitigar problemas e encaminhar as soluções..." ${!podeEditar ? 'disabled' : ''}>${diagnostico?.recomendacoesProximosPassos || ''}</textarea>
+            <span class="form-error-msg" id="err-diag-recomendacoes" style="display: none;"></span>
             <span class="form-hint">Orientações aos gestores das áreas para superação de gargalos.</span>
           </div>
         </div>
@@ -187,9 +198,11 @@ export async function renderDiagnostico(container) {
           <button type="button" class="btn btn-secondary btn-sm" id="btn-ir-matriz-riscos">
             <span class="material-symbols-outlined">grid_view</span> Ver Matriz Completa
           </button>
-          <button type="button" class="btn btn-primary btn-sm" id="btn-abrir-modal-risco">
-            <span class="material-symbols-outlined">add_alert</span> Mapear Risco
-          </button>
+          ${podeEditar ? `
+            <button type="button" class="btn btn-primary btn-sm" id="btn-abrir-modal-risco">
+              <span class="material-symbols-outlined">add_alert</span> Mapear Risco
+            </button>
+          ` : ''}
         </div>
       </div>
 
@@ -207,7 +220,7 @@ export async function renderDiagnostico(container) {
               const { pontuacao, classificacao } = calcularClassificacaoRisco(r.probabilidade, r.impacto);
               const badgeClass = classificacao === 'Alto' ? 'badge-danger' : (classificacao === 'Moderado' ? 'badge-warning' : 'badge-success');
               return `
-                <div style="padding: 12px 14px; background: #ffffff; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                <div style="padding: 12px 14px; background: #ffffff; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
                     <div style="font-weight: 600; font-size: 13px; color: var(--text-main);">
                       #${r.numero} ${r.titulo}
@@ -216,9 +229,22 @@ export async function renderDiagnostico(container) {
                       ${classificacao} (${pontuacao} pts)
                     </span>
                   </div>
-                  <div style="font-size: 11.5px; color: var(--text-muted); display: flex; justify-content: space-between;">
-                    <span>Área: <strong style="color: var(--text-secondary);">${r.areaResponsavel || 'Compartilhada'}</strong></span>
+                  <div style="font-size: 11.5px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+                    <span>Área: <strong style="color: var(--text-secondary);">${r.areaResponsavel || 'Geral'}</strong></span>
                     <span>P: ${r.probabilidade} | I: ${r.impacto}</span>
+                  </div>
+                  <div style="display: flex; justify-content: flex-end; gap: 6px; border-top: 1px solid var(--border-color-light, #f1f5f9); padding-top: 6px;">
+                    <button type="button" class="btn btn-secondary btn-sm btn-diag-ver-risco" data-id="${r.id}" title="Consultar detalhes do risco" style="padding: 2px 6px; font-size: 11.5px;">
+                      <span class="material-symbols-outlined" style="font-size: 14px;">visibility</span>
+                    </button>
+                    ${podeEditar ? `
+                      <button type="button" class="btn btn-secondary btn-sm btn-diag-editar-risco" data-id="${r.id}" title="Editar risco" style="padding: 2px 6px; font-size: 11.5px;">
+                        <span class="material-symbols-outlined" style="font-size: 14px;">edit</span>
+                      </button>
+                      <button type="button" class="btn btn-secondary btn-sm btn-diag-excluir-risco" data-id="${r.id}" title="Excluir risco" style="padding: 2px 6px; font-size: 11.5px; color: var(--color-danger, #ef4444);">
+                        <span class="material-symbols-outlined" style="font-size: 14px;">delete</span>
+                      </button>
+                    ` : ''}
                   </div>
                 </div>
               `;
@@ -282,6 +308,7 @@ export async function renderDiagnostico(container) {
       selectedValues: areasSelecionadas,
       placeholder: 'Selecione as áreas institucionais executoras...',
       searchPlaceholder: 'Buscar diretoria ou divisão...',
+      disabled: !podeEditar,
       onChange: (novasAreas) => {
         areasSelecionadas = novasAreas;
         setDirty(true);
@@ -292,9 +319,14 @@ export async function renderDiagnostico(container) {
   const formDiag = container.querySelector('#form-diagnostico');
   const btnSalvar = container.querySelector('#btn-salvar-diagnostico');
 
-  // Monitora dirty state
+  // Monitora dirty state e limpa erros
   formDiag.querySelectorAll('input, textarea').forEach(el => {
-    el.addEventListener('input', () => setDirty(true));
+    el.addEventListener('input', () => {
+      setDirty(true);
+      el.classList.remove('is-invalid');
+      const errEl = container.querySelector(`#err-${el.id}`);
+      if (errEl) errEl.style.display = 'none';
+    });
     el.addEventListener('change', () => setDirty(true));
   });
 
@@ -315,40 +347,115 @@ export async function renderDiagnostico(container) {
     });
   });
 
-  // Salvar Diagnóstico
-  btnSalvar.addEventListener('click', async () => {
-    const situacaoAtual = container.querySelector('#diag-situacao').value.trim();
-    const recomendacoesProximosPassos = container.querySelector('#diag-recomendacoes').value.trim();
+  // Salvar Diagnóstico com Validação Inline
+  if (btnSalvar) {
+    btnSalvar.addEventListener('click', async () => {
+      const inputSituacao = container.querySelector('#diag-situacao');
+      const inputRecomendacoes = container.querySelector('#diag-recomendacoes');
+      const errSituacao = container.querySelector('#err-diag-situacao');
+      const errRecomendacoes = container.querySelector('#err-diag-recomendacoes');
 
-    if (!situacaoAtual || !recomendacoesProximosPassos) {
-      showToast('Por favor, preencha a situação atual e as recomendações.', 'warning');
-      return;
-    }
+      let hasError = false;
 
-    const classificacao = container.querySelector('input[name="diag-classificacao"]:checked')?.value || 'em_andamento';
+      const situacaoAtual = inputSituacao.value.trim();
+      if (!situacaoAtual) {
+        inputSituacao.classList.add('is-invalid');
+        if (errSituacao) {
+          errSituacao.textContent = 'A descrição da situação atual é obrigatória.';
+          errSituacao.style.display = 'block';
+        }
+        hasError = true;
+      }
 
-    try {
-      btnSalvar.disabled = true;
-      btnSalvar.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span> Salvando...`;
+      const recomendacoesProximosPassos = inputRecomendacoes.value.trim();
+      if (!recomendacoesProximosPassos) {
+        inputRecomendacoes.classList.add('is-invalid');
+        if (errRecomendacoes) {
+          errRecomendacoes.textContent = 'As recomendações e próximos passos são obrigatórios.';
+          errRecomendacoes.style.display = 'block';
+        }
+        hasError = true;
+      }
 
-      const { currentUser } = getState();
-      await DiagnosticosService.salvarDiagnostico({
-        projetoId: projeto.id,
-        classificacao,
-        situacaoAtual,
-        recomendacoesProximosPassos,
-        areasResponsaveisExecucao: areasSelecionadas
-      }, currentUser);
+      if (hasError) {
+        showToast('Preencha os campos obrigatórios do diagnóstico.', 'warning');
+        return;
+      }
 
-      setDirty(false);
-      showToast('Diagnóstico DIST registrado com sucesso!', 'success');
-      renderDiagnostico(container);
-    } catch (err) {
-      showToast(`Erro ao gravar diagnóstico: ${err.message}`, 'danger');
-    } finally {
-      btnSalvar.disabled = false;
-      btnSalvar.innerHTML = `<span class="material-symbols-outlined">save</span> Gravar Diagnóstico`;
-    }
+      const classificacao = container.querySelector('input[name="diag-classificacao"]:checked')?.value || 'em_andamento';
+
+      try {
+        btnSalvar.disabled = true;
+        btnSalvar.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span> Salvando...`;
+
+        const { currentUser } = getState();
+        await DiagnosticosService.salvarDiagnostico({
+          projetoId: projeto.id,
+          classificacao,
+          situacaoAtual,
+          recomendacoesProximosPassos,
+          areasResponsaveisExecucao: areasSelecionadas
+        }, currentUser);
+
+        setDirty(false);
+        showToast('Diagnóstico DIST registrado com sucesso!', 'success');
+        renderDiagnostico(container);
+      } catch (err) {
+        showToast(`Erro ao gravar diagnóstico: ${err.message}`, 'danger');
+      } finally {
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = `<span class="material-symbols-outlined">save</span> Gravar Diagnóstico`;
+      }
+    });
+  }
+
+  // Modal de Histórico de Evolução
+  container.querySelector('#btn-historico-diagnostico')?.addEventListener('click', () => {
+    const historico = Array.isArray(diagnostico?.historicoEvolucao) ? diagnostico.historicoEvolucao : [];
+    
+    const content = `
+      <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
+        ${historico.length === 0 ? `
+          <div style="text-align: center; padding: 32px 16px; color: var(--text-muted);">
+            <span class="material-symbols-outlined" style="font-size: 36px; margin-bottom: 8px;">history</span>
+            <p>Nenhuma versão anterior registrada no histórico de evolução deste projeto.</p>
+          </div>
+        ` : `
+          <div class="diag-history-timeline" style="display: flex; flex-direction: column; gap: 16px;">
+            ${historico.map((item, idx) => {
+              const classLabel = LABELS_CLASSIFICACAO_DIAGNOSTICO[item.classificacao] || item.classificacao;
+              const dataFmt = item.timestamp ? new Date(item.timestamp).toLocaleString('pt-BR') : 'Data não informada';
+              return `
+                <div class="diag-history-item" style="padding: 14px; background: var(--bg-hover-subtle); border-radius: 8px; border-left: 4px solid var(--color-primary);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                    <div>
+                      <strong style="font-size: 13px; color: var(--text-main);">${dataFmt}</strong>
+                      <span style="font-size: 11.5px; color: var(--text-muted); margin-left: 6px;">por ${item.atualizadoPor?.nome || 'Usuário'}</span>
+                    </div>
+                    <span class="badge badge-primary" style="font-size: 11px;">${classLabel}</span>
+                  </div>
+                  <div style="font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); margin-bottom: 6px;">
+                    <strong style="color: var(--text-main);">Situação Atual:</strong> ${item.situacaoAtual || '—'}
+                  </div>
+                  <div style="font-size: 12.5px; line-height: 1.5; color: var(--text-secondary);">
+                    <strong style="color: var(--text-main);">Recomendações:</strong> ${item.recomendacoesProximosPassos || '—'}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+    `;
+
+    openModal({
+      title: 'Histórico de Evolução do Diagnóstico DIST',
+      content,
+      footerHtml: `<button type="button" class="btn btn-primary" id="btn-fechar-hist-diag">Fechar</button>`,
+      maxWidth: '640px'
+    });
+
+    document.querySelector('#btn-fechar-hist-diag')?.addEventListener('click', closeModal);
   });
 
   // Navegar para Matriz de Riscos
@@ -356,22 +463,25 @@ export async function renderDiagnostico(container) {
     guardedNavigate(() => setActiveTab('matriz-riscos'));
   });
 
-  // Modal para Adicionar Novo Risco
-  const abrirModalCadastroRisco = () => {
+  // Modal para Adicionar, Editar ou Visualizar Risco
+  const abrirModalCadastroRisco = (riscoExistente = null, apenasVisualizar = false) => {
+    const isEdicao = !!riscoExistente && !apenasVisualizar;
+    const isVisualizacao = !!apenasVisualizar;
+
     const content = `
       <form id="form-modal-risco" style="display: flex; flex-direction: column; gap: 16px;">
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label" for="mr-titulo">Título do Risco <span class="required">*</span></label>
-          <input type="text" id="mr-titulo" class="form-input" required placeholder="Ex: Atraso na liberação de acessos ao ambiente de homologação">
+          <input type="text" id="mr-titulo" class="form-input" required value="${riscoExistente?.titulo || ''}" placeholder="Ex: Atraso na liberação de acessos ao ambiente de homologação" ${isVisualizacao ? 'disabled' : ''}>
           <span class="form-hint">Identificação breve e clara do evento de risco.</span>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="mr-area">Área Responsável <span class="required">*</span></label>
-            <select id="mr-area" class="form-select" required>
+            <select id="mr-area" class="form-select" required ${isVisualizacao ? 'disabled' : ''}>
               ${areasParaRiscos.map(a => `
-                <option value="${a}" ${a === 'DIST - Divisão de Integração Setorial' ? 'selected' : ''}>${a}</option>
+                <option value="${a}" ${a === (riscoExistente?.areaResponsavel || 'DIST - Divisão de Integração Setorial') ? 'selected' : ''}>${a}</option>
               `).join('')}
             </select>
           </div>
@@ -379,19 +489,19 @@ export async function renderDiagnostico(container) {
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" for="mr-p">Probabilidade (1 a 3)</label>
-              <select id="mr-p" class="form-select">
-                <option value="1">1 — Baixa</option>
-                <option value="2" selected>2 — Média</option>
-                <option value="3">3 — Alta</option>
+              <select id="mr-p" class="form-select" ${isVisualizacao ? 'disabled' : ''}>
+                <option value="1" ${riscoExistente?.probabilidade === 1 ? 'selected' : ''}>1 — Baixa</option>
+                <option value="2" ${!riscoExistente || riscoExistente?.probabilidade === 2 ? 'selected' : ''}>2 — Média</option>
+                <option value="3" ${riscoExistente?.probabilidade === 3 ? 'selected' : ''}>3 — Alta</option>
               </select>
             </div>
 
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" for="mr-i">Impacto (1 a 3)</label>
-              <select id="mr-i" class="form-select">
-                <option value="1">1 — Baixo</option>
-                <option value="2" selected>2 — Médio</option>
-                <option value="3">3 — Alto</option>
+              <select id="mr-i" class="form-select" ${isVisualizacao ? 'disabled' : ''}>
+                <option value="1" ${riscoExistente?.impacto === 1 ? 'selected' : ''}>1 — Baixo</option>
+                <option value="2" ${!riscoExistente || riscoExistente?.impacto === 2 ? 'selected' : ''}>2 — Médio</option>
+                <option value="3" ${riscoExistente?.impacto === 3 ? 'selected' : ''}>3 — Alto</option>
               </select>
             </div>
           </div>
@@ -399,7 +509,7 @@ export async function renderDiagnostico(container) {
 
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label" for="mr-desc">Descrição e Mitigação do Risco</label>
-          <textarea id="mr-desc" class="form-textarea" rows="3" placeholder="Explique as consequências, causas raízes e ações planejadas..."></textarea>
+          <textarea id="mr-desc" class="form-textarea" rows="3" placeholder="Explique as consequências, causas raízes e ações planejadas..." ${isVisualizacao ? 'disabled' : ''}>${riscoExistente?.descricao || ''}</textarea>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-hover, #f8fafc); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border-color, #e2e8f0);">
@@ -409,15 +519,17 @@ export async function renderDiagnostico(container) {
       </form>
     `;
 
-    const footerHtml = `
-      <button type="button" class="btn btn-secondary" id="btn-mr-cancelar">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="btn-mr-salvar">
-        <span class="material-symbols-outlined">add_task</span> Salvar Risco
-      </button>
-    `;
+    const footerHtml = isVisualizacao
+      ? `<button type="button" class="btn btn-primary" id="btn-mr-cancelar">Fechar</button>`
+      : `
+        <button type="button" class="btn btn-secondary" id="btn-mr-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-mr-salvar">
+          <span class="material-symbols-outlined">add_task</span> ${isEdicao ? 'Atualizar Risco' : 'Salvar Risco'}
+        </button>
+      `;
 
     const modal = openModal({
-      title: 'Catalogar Novo Risco do Projeto',
+      title: isVisualizacao ? `Detalhes do Risco #${riscoExistente?.numero}` : (isEdicao ? `Editar Risco #${riscoExistente?.numero}` : 'Catalogar Novo Risco do Projeto'),
       content,
       footerHtml,
       maxWidth: '560px'
@@ -442,37 +554,87 @@ export async function renderDiagnostico(container) {
 
     modal.querySelector('#btn-mr-cancelar').addEventListener('click', closeModal);
 
-    modal.querySelector('#btn-mr-salvar').addEventListener('click', async () => {
-      const titulo = modal.querySelector('#mr-titulo').value.trim();
-      if (!titulo) {
-        showToast('O título do risco é obrigatório.', 'warning');
-        return;
-      }
+    const btnSalvarRisco = modal.querySelector('#btn-mr-salvar');
+    if (btnSalvarRisco) {
+      btnSalvarRisco.addEventListener('click', async () => {
+        const titulo = modal.querySelector('#mr-titulo').value.trim();
+        if (!titulo) {
+          showToast('O título do risco é obrigatório.', 'warning');
+          return;
+        }
 
-      const areaResponsavel = modal.querySelector('#mr-area').value;
-      const descricao = modal.querySelector('#mr-desc').value.trim();
-      const p = parseInt(pSel.value, 10);
-      const i = parseInt(iSel.value, 10);
+        const areaResponsavel = modal.querySelector('#mr-area').value;
+        const descricao = modal.querySelector('#mr-desc').value.trim();
+        const p = parseInt(pSel.value, 10);
+        const i = parseInt(iSel.value, 10);
 
-      try {
-        const { currentUser } = getState();
-        const salvo = await RiscosService.salvarRisco({
-          projetoId: projeto.id,
-          titulo,
-          areaResponsavel,
-          descricao,
-          probabilidade: p,
-          impacto: i
-        }, currentUser);
+        try {
+          const { currentUser } = getState();
+          const payload = {
+            projetoId: projeto.id,
+            titulo,
+            areaResponsavel,
+            descricao,
+            probabilidade: p,
+            impacto: i
+          };
 
-        showToast(`Risco #${salvo.numero} catalogado com sucesso!`, 'success');
-        closeModal();
-        renderDiagnostico(container);
-      } catch (err) {
-        showToast(`Erro ao salvar risco: ${err.message}`, 'danger');
-      }
-    });
+          if (isEdicao) {
+            await RiscosService.atualizarRisco(riscoExistente.id, {
+              ...payload,
+              id: riscoExistente.id,
+              numero: riscoExistente.numero
+            }, currentUser);
+            showToast(`Risco #${riscoExistente.numero} atualizado com sucesso!`, 'success');
+          } else {
+            const salvo = await RiscosService.salvarRisco(payload, currentUser);
+            showToast(`Risco #${salvo.numero} catalogado com sucesso!`, 'success');
+          }
+
+          closeModal();
+          renderDiagnostico(container);
+        } catch (err) {
+          showToast(`Erro ao salvar risco: ${err.message}`, 'danger');
+        }
+      });
+    }
   };
 
-  container.querySelector('#btn-abrir-modal-risco')?.addEventListener('click', abrirModalCadastroRisco);
+  // Conecta ações nos cards de riscos
+  container.querySelectorAll('.btn-diag-ver-risco').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const r = riscos.find(x => x.id === id);
+      if (r) abrirModalCadastroRisco(r, true);
+    });
+  });
+
+  container.querySelectorAll('.btn-diag-editar-risco').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const r = riscos.find(x => x.id === id);
+      if (r) abrirModalCadastroRisco(r, false);
+    });
+  });
+
+  container.querySelectorAll('.btn-diag-excluir-risco').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const r = riscos.find(x => x.id === id);
+      if (!r) return;
+
+      if (confirm(`Deseja realmente excluir o risco #${r.numero} "${r.titulo}"?`)) {
+        try {
+          const { currentUser } = getState();
+          await RiscosService.excluirRisco(id, currentUser);
+          showToast(`Risco #${r.numero} excluído com sucesso!`, 'info');
+          renderDiagnostico(container);
+        } catch (err) {
+          showToast(`Erro ao excluir: ${err.message}`, 'danger');
+        }
+      }
+    });
+  });
+
+  container.querySelector('#btn-abrir-modal-risco')?.addEventListener('click', () => abrirModalCadastroRisco(null));
 }
