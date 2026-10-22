@@ -4,8 +4,9 @@
  * nas abas do Módulo DIST (Visão Geral, Diagnóstico, Matriz de Riscos).
  */
 
-import { getState, setActiveTab } from '../store/state.js';
+import { getState, setActiveTab, canEdit } from '../store/state.js';
 import { guardedNavigate } from './dirty-guard.js';
+import { formatarDataOuPeriodo } from '../services/projetos.service.js';
 
 export function renderProjectContextCard(projeto, { showEditButton = true, extraBadgesHtml = '' } = {}) {
   if (!projeto) return '';
@@ -18,17 +19,10 @@ export function renderProjectContextCard(projeto, { showEditButton = true, extra
     ? projeto.areasDetranEnvolvidas
     : [];
 
-  const dataInicioFormatada = projeto.dataInicio
-    ? (projeto.dataInicio.includes('-') && !isNaN(Date.parse(projeto.dataInicio))
-        ? new Date(projeto.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')
-        : projeto.dataInicio)
-    : '—';
-
-  const dataFimFormatada = projeto.previsaoEncerramento
-    ? (projeto.previsaoEncerramento.includes('-') && !isNaN(Date.parse(projeto.previsaoEncerramento))
-        ? new Date(projeto.previsaoEncerramento + 'T00:00:00').toLocaleDateString('pt-BR')
-        : projeto.previsaoEncerramento)
-    : '—';
+  const inicioObj = formatarDataOuPeriodo(projeto.dataInicio);
+  const fimObj = formatarDataOuPeriodo(projeto.previsaoEncerramento);
+  const inicioHtml = `${inicioObj.texto}${inicioObj.isPrevisao && inicioObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; margin-left: 4px;" title="Período estimado">Previsão</span>' : ''}`;
+  const fimHtml = `${fimObj.texto}${fimObj.isPrevisao && fimObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; margin-left: 4px;" title="Período estimado">Previsão</span>' : ''}`;
 
   const nomeProjeto = projeto.nome || projeto.nome_projeto || 'Projeto sem nome';
 
@@ -54,7 +48,7 @@ export function renderProjectContextCard(projeto, { showEditButton = true, extra
             ${projeto.distHabilitado ? 'Módulo DIST Ativo' : 'DIST Desativado'}
           </span>
           ${extraBadgesHtml}
-          ${showEditButton ? `
+          ${showEditButton && canEdit() ? `
             <button type="button" class="btn btn-secondary btn-sm" id="btn-context-edit-proj" title="Editar informações cadastrais do projeto">
               <span class="material-symbols-outlined" style="font-size: 15px;">tune</span> Detalhes
             </button>
@@ -117,7 +111,7 @@ export function renderProjectContextCard(projeto, { showEditButton = true, extra
           <div class="project-context-item-info">
             <span class="project-context-label">Vigência / Cronograma</span>
             <span class="project-context-value">
-              ${dataInicioFormatada} <span style="color: var(--text-muted); font-weight: normal;">até</span> ${dataFimFormatada}
+              ${inicioHtml} <span style="color: var(--text-muted); font-weight: normal;">até</span> ${fimHtml}
             </span>
           </div>
         </div>

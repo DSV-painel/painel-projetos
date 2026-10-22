@@ -10,19 +10,23 @@
 import { ProjetosService } from '../services/projetos.service.js';
 import { DiagnosticosService } from '../services/diagnosticos.service.js';
 import { RiscosService } from '../services/riscos.service.js';
-import { setActiveProject, setActiveTab } from '../store/state.js';
+import { setActiveProject, setActiveTab, canEdit } from '../store/state.js';
 import { guardedNavigate } from '../components/dirty-guard.js';
 
 export async function renderDashboard(container) {
+  const podeEditar = canEdit();
+
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
       <div>
         <h1 class="page-title">Painel de Acompanhamento</h1>
         <p class="subtitle">Visão consolidada de projetos interinstitucionais, diagnósticos e exposição a riscos.</p>
       </div>
-      <button type="button" class="btn btn-primary" id="btn-novo-projeto-dash">
-        <span class="material-symbols-outlined">add</span> Novo Projeto
-      </button>
+      ${podeEditar ? `
+        <button type="button" class="btn btn-primary" id="btn-novo-projeto-dash">
+          <span class="material-symbols-outlined">add</span> Novo Projeto
+        </button>
+      ` : ''}
     </div>
 
     <!-- Grid de KPIs Principais -->
@@ -202,51 +206,69 @@ export async function renderDashboard(container) {
   `;
 
   const chartContainer = document.getElementById('portfolio-chart-container');
-  chartContainer.innerHTML = `
-    ${renderBarItem('Em estruturação', contagemEstruturacao, '#0284c7', pct(contagemEstruturacao))}
-    ${renderBarItem('Em andamento', contagemAndamento, 'var(--color-success)', pct(contagemAndamento))}
-    ${renderBarItem('Requer atenção', contagemRequerAtencao, 'var(--color-warning)', pct(contagemRequerAtencao))}
-    ${renderBarItem('Requer decisão estratégica', contagemDecisaoEstrategica, 'var(--color-danger)', pct(contagemDecisaoEstrategica))}
-    ${renderBarItem('Concluído', contagemConcluido, '#4338ca', pct(contagemConcluido))}
-    ${renderBarItem('Pendente de Diagnóstico', contagemPendentes, 'var(--color-neutral)', pct(contagemPendentes))}
-  `;
+  if (totalProjetos === 0) {
+    chartContainer.innerHTML = `
+      <div style="text-align: center; padding: 24px 16px; color: var(--text-muted); font-size: 13px;">
+        <span class="material-symbols-outlined" style="font-size: 32px; margin-bottom: 6px; display: block; color: var(--text-muted);">folder_off</span>
+        Nenhum projeto cadastrado no portfólio.
+      </div>
+    `;
+  } else {
+    chartContainer.innerHTML = `
+      ${renderBarItem('Em estruturação', contagemEstruturacao, '#0284c7', pct(contagemEstruturacao))}
+      ${renderBarItem('Em andamento', contagemAndamento, 'var(--color-success)', pct(contagemAndamento))}
+      ${renderBarItem('Requer atenção', contagemRequerAtencao, 'var(--color-warning)', pct(contagemRequerAtencao))}
+      ${renderBarItem('Requer decisão estratégica', contagemDecisaoEstrategica, 'var(--color-danger)', pct(contagemDecisaoEstrategica))}
+      ${renderBarItem('Concluído', contagemConcluido, '#4338ca', pct(contagemConcluido))}
+      ${renderBarItem('Pendente de Diagnóstico', contagemPendentes, 'var(--color-neutral)', pct(contagemPendentes))}
+    `;
+  }
 
   // Renderiza Exposição a Riscos
   const exposureContainer = document.getElementById('risk-exposure-container');
-  exposureContainer.innerHTML = `
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
-      <div style="padding: 12px; background: var(--color-success-bg); border-radius: 8px; border: 1px solid var(--color-success-border);">
-        <div style="font-size: 18px; font-weight: var(--font-weight-extrabold); color: var(--color-success);">${riscosBaixos}</div>
-        <div style="font-size: 11px; font-weight: var(--font-weight-bold); text-transform: uppercase; color: var(--color-success);">Baixos</div>
+  if (totalRiscos === 0) {
+    exposureContainer.innerHTML = `
+      <div style="text-align: center; padding: 24px 16px; color: var(--text-muted); font-size: 13px;">
+        <span class="material-symbols-outlined" style="font-size: 32px; margin-bottom: 6px; display: block; color: var(--text-muted);">verified_user</span>
+        Nenhum risco mapeado nos projetos até o momento.
       </div>
-      <div style="padding: 12px; background: var(--color-warning-bg); border-radius: 8px; border: 1px solid var(--color-warning-border);">
-        <div style="font-size: 18px; font-weight: var(--font-weight-extrabold); color: var(--color-warning);">${riscosModerados}</div>
-        <div style="font-size: 11px; font-weight: var(--font-weight-bold); text-transform: uppercase; color: var(--color-warning);">Moderados</div>
+    `;
+  } else {
+    exposureContainer.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
+        <div style="padding: 12px; background: var(--color-success-bg); border-radius: 8px; border: 1px solid var(--color-success-border);">
+          <div style="font-size: 18px; font-weight: var(--font-weight-extrabold); color: var(--color-success);">${riscosBaixos}</div>
+          <div style="font-size: 11px; font-weight: var(--font-weight-bold); text-transform: uppercase; color: var(--color-success);">Baixos</div>
+        </div>
+        <div style="padding: 12px; background: var(--color-warning-bg); border-radius: 8px; border: 1px solid var(--color-warning-border);">
+          <div style="font-size: 18px; font-weight: var(--font-weight-extrabold); color: var(--color-warning);">${riscosModerados}</div>
+          <div style="font-size: 11px; font-weight: var(--font-weight-bold); text-transform: uppercase; color: var(--color-warning);">Moderados</div>
+        </div>
+        <div style="padding: 12px; background: var(--color-danger-bg); border-radius: 8px; border: 1px solid var(--color-danger-border);">
+          <div style="font-size: 18px; font-weight: var(--font-weight-extrabold); color: var(--color-danger);">${riscosAltos}</div>
+          <div style="font-size: 11px; font-weight: var(--font-weight-bold); text-transform: uppercase; color: var(--color-danger);">Altos</div>
+        </div>
       </div>
-      <div style="padding: 12px; background: var(--color-danger-bg); border-radius: 8px; border: 1px solid var(--color-danger-border);">
-        <div style="font-size: 18px; font-weight: var(--font-weight-extrabold); color: var(--color-danger);">${riscosAltos}</div>
-        <div style="font-size: 11px; font-weight: var(--font-weight-bold); text-transform: uppercase; color: var(--color-danger);">Altos</div>
-      </div>
-    </div>
 
-    <!-- Barra composta de proporção -->
-    <div style="margin-top: 10px;">
-      <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; display: flex; justify-content: space-between;">
-        <span>Composição do Perfil de Risco</span>
-        <span style="font-weight: var(--font-weight-bold);">${totalRiscos} riscos no total</span>
+      <!-- Barra composta de proporção -->
+      <div style="margin-top: 10px;">
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; display: flex; justify-content: space-between;">
+          <span>Composição do Perfil de Risco</span>
+          <span style="font-weight: var(--font-weight-bold);">${totalRiscos} riscos no total</span>
+        </div>
+        <div style="display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: #e2e8f0;">
+          <div style="width: ${totalRiscos > 0 ? (riscosBaixos/totalRiscos)*100 : 0}%; background: var(--color-success);" title="Baixos: ${riscosBaixos}"></div>
+          <div style="width: ${totalRiscos > 0 ? (riscosModerados/totalRiscos)*100 : 0}%; background: var(--color-warning);" title="Moderados: ${riscosModerados}"></div>
+          <div style="width: ${totalRiscos > 0 ? (riscosAltos/totalRiscos)*100 : 0}%; background: var(--color-danger);" title="Altos: ${riscosAltos}"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+          <span>Baixo (${totalRiscos > 0 ? Math.round((riscosBaixos/totalRiscos)*100) : 0}%)</span>
+          <span>Moderado (${totalRiscos > 0 ? Math.round((riscosModerados/totalRiscos)*100) : 0}%)</span>
+          <span>Alto (${propAltosPercent}%)</span>
+        </div>
       </div>
-      <div style="display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: #e2e8f0;">
-        <div style="width: ${totalRiscos > 0 ? (riscosBaixos/totalRiscos)*100 : 0}%; background: var(--color-success);" title="Baixos: ${riscosBaixos}"></div>
-        <div style="width: ${totalRiscos > 0 ? (riscosModerados/totalRiscos)*100 : 0}%; background: var(--color-warning);" title="Moderados: ${riscosModerados}"></div>
-        <div style="width: ${totalRiscos > 0 ? (riscosAltos/totalRiscos)*100 : 0}%; background: var(--color-danger);" title="Altos: ${riscosAltos}"></div>
-      </div>
-      <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-        <span>Baixo (${totalRiscos > 0 ? Math.round((riscosBaixos/totalRiscos)*100) : 0}%)</span>
-        <span>Moderado (${totalRiscos > 0 ? Math.round((riscosModerados/totalRiscos)*100) : 0}%)</span>
-        <span>Alto (${propAltosPercent}%)</span>
-      </div>
-    </div>
-  `;
+    `;
+  }
 
   // Renderiza Tabela de Projetos no Dashboard
   const tbody = document.getElementById('tbody-dashboard-projects');

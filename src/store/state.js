@@ -127,3 +127,12 @@ export function canEdit() {
          state.currentUser.perfil !== 'leitor' && 
          state.currentUser.perfil !== 'sem_acesso';
 }
+
+/**
+ * Checa se o usuário atual é administrador
+ * @returns {boolean}
+ */
+export function isAdmin() {
+  return state.currentUser?.perfil === 'admin';
+}
+

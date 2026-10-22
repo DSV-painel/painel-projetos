@@ -3,7 +3,7 @@
  * Conforme Seção 4 do documento de regras de negócio:
  * - Informações do Projeto & Escopo com períodos flexíveis
  * - Dropdown Multiselect institucional moderno para Áreas Detran Envolvidas
- * - Gestão de Pontos Focais e Contatos em cartões elegantes
+ * - Gestão de Pontos Focais e Contatos integrada à base CRM (/contatos)
  */
 import { getState, setActiveProject, setDirty, canEdit } from '../store/state.js';
 import { ProjetosService } from '../services/projetos.service.js';
@@ -16,6 +16,7 @@ import { renderMultiselectDropdown } from '../components/multiselect-dropdown.co
 
 export async function renderVisaoGeral(container) {
   const { activeProject } = getState();
+  const podeEditar = canEdit();
 
   if (!activeProject) {
     container.innerHTML = `
@@ -65,9 +66,11 @@ export async function renderVisaoGeral(container) {
           <span class="material-symbols-outlined">assignment</span>
           <h3 class="card-title">Informações do Projeto & Escopo</h3>
         </div>
-        <button type="button" class="btn btn-primary" id="btn-gravar-info-projeto">
-          <span class="material-symbols-outlined">save</span> Gravar Informações
-        </button>
+        ${podeEditar ? `
+          <button type="button" class="btn btn-primary" id="btn-gravar-info-projeto">
+            <span class="material-symbols-outlined">save</span> Gravar Informações
+          </button>
+        ` : ''}
       </div>
 
       <form id="form-visao-geral">
@@ -77,17 +80,18 @@ export async function renderVisaoGeral(container) {
           <div style="display: flex; flex-direction: column; gap: 18px;">
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" for="vg-nome">Nome do Projeto <span class="required">*</span></label>
-              <input type="text" id="vg-nome" class="form-input" value="${projeto.nome || projeto.nome_projeto || ''}" required placeholder="Nome oficial do projeto">
+              <input type="text" id="vg-nome" class="form-input" value="${projeto.nome || projeto.nome_projeto || ''}" required placeholder="Nome oficial do projeto" ${!podeEditar ? 'disabled' : ''}>
+              <span class="form-error-msg" id="err-vg-nome" style="display: none;"></span>
             </div>
 
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" for="vg-objetivo">Objetivo do Projeto</label>
-              <textarea id="vg-objetivo" class="form-textarea" rows="3" placeholder="Descreva os resultados pretendidos com o projeto...">${projeto.objetivo || ''}</textarea>
+              <textarea id="vg-objetivo" class="form-textarea" rows="3" placeholder="Descreva os resultados pretendidos com o projeto..." ${!podeEditar ? 'disabled' : ''}>${projeto.objetivo || ''}</textarea>
             </div>
 
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" for="vg-escopo">Escopo do Projeto</label>
-              <textarea id="vg-escopo" class="form-textarea" rows="5" placeholder="Descreva as atividades, entregas e limites do projeto...">${projeto.escopo || ''}</textarea>
+              <textarea id="vg-escopo" class="form-textarea" rows="5" placeholder="Descreva as atividades, entregas e limites do projeto..." ${!podeEditar ? 'disabled' : ''}>${projeto.escopo || ''}</textarea>
             </div>
           </div>
 
@@ -98,14 +102,15 @@ export async function renderVisaoGeral(container) {
                 <label class="form-label" for="vg-inicio">Data / Período Início</label>
                 <input type="text" id="vg-inicio" class="form-input" 
                   value="${projeto.dataInicio || ''}" 
-                  placeholder="Ex: 2026-02-01 ou 1º sem/26">
+                  placeholder="Ex: 2026-02-01 ou 1º sem/26" ${!podeEditar ? 'disabled' : ''}>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label" for="vg-fim">Previsão Fim</label>
                 <input type="text" id="vg-fim" class="form-input" 
                   value="${projeto.previsaoEncerramento || ''}" 
-                  placeholder="Ex: 2026-12-15 ou Dez/26">
+                  placeholder="Ex: 2026-12-15 ou Dez/26" ${!podeEditar ? 'disabled' : ''}>
+                <span class="form-error-msg" id="err-vg-fim" style="display: none;"></span>
               </div>
             </div>
 
@@ -113,7 +118,7 @@ export async function renderVisaoGeral(container) {
               <label class="form-label" for="vg-entes">Entes Externos Envolvidos</label>
               <input type="text" id="vg-entes" class="form-input" 
                 value="${Array.isArray(projeto.entesExternos) ? projeto.entesExternos.join(', ') : (projeto.entesExternos || '')}" 
-                placeholder="Ex: CET, DER, Polícia Rodoviária (separar por vírgula)">
+                placeholder="Ex: CET, DER, Polícia Rodoviária (separar por vírgula)" ${!podeEditar ? 'disabled' : ''}>
               <span class="form-hint">Órgãos públicos parceiros externos ao Detran.</span>
             </div>
 
@@ -136,9 +141,11 @@ export async function renderVisaoGeral(container) {
           <span class="material-symbols-outlined">contact_phone</span>
           <h3 class="card-title">Pontos Focais e Contatos Institucionais</h3>
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" id="btn-novo-contato">
-          <span class="material-symbols-outlined">person_add</span> Cadastrar Contato
-        </button>
+        ${podeEditar ? `
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-novo-contato">
+            <span class="material-symbols-outlined">person_add</span> Cadastrar Contato
+          </button>
+        ` : ''}
       </div>
 
       <div id="contatos-container">
@@ -151,7 +158,7 @@ export async function renderVisaoGeral(container) {
   attachProjectContextCardEvents(container);
 
   // Inicializa o Dropdown Multiselect de Áreas
-  const multiselectAreas = renderMultiselectDropdown(
+  renderMultiselectDropdown(
     container.querySelector('#vg-multiselect-areas-container'),
     {
       id: 'vg-areas-multiselect',
@@ -159,6 +166,7 @@ export async function renderVisaoGeral(container) {
       selectedValues: selectedAreasList,
       placeholder: 'Selecione as áreas Detran envolvidas...',
       searchPlaceholder: 'Buscar diretoria ou divisão...',
+      disabled: !podeEditar,
       onChange: (novasAreas) => {
         selectedAreasList = novasAreas;
         setDirty(true);
@@ -166,7 +174,7 @@ export async function renderVisaoGeral(container) {
     }
   );
 
-  // Renderiza cartões elegantes de contatos
+  // Renderiza cartões de contatos
   const renderContatos = (lista) => {
     const contatosDiv = container.querySelector('#contatos-container');
     if (!contatosDiv) return;
@@ -196,14 +204,16 @@ export async function renderVisaoGeral(container) {
                     <div class="contact-card-role">${c.cargo || 'Ponto Focal'}</div>
                   </div>
                 </div>
-                <div style="display: flex; gap: 4px;">
-                  <button type="button" class="btn btn-secondary btn-sm btn-editar-contato" data-id="${c.id}" title="Editar contato" style="padding: 4px 6px;">
-                    <span class="material-symbols-outlined" style="font-size: 15px;">edit</span>
-                  </button>
-                  <button type="button" class="btn btn-secondary btn-sm btn-excluir-contato" data-id="${c.id}" title="Remover contato" style="padding: 4px 6px; color: var(--color-danger, #ef4444);">
-                    <span class="material-symbols-outlined" style="font-size: 15px;">delete</span>
-                  </button>
-                </div>
+                ${podeEditar ? `
+                  <div style="display: flex; gap: 4px;">
+                    <button type="button" class="btn btn-secondary btn-sm btn-editar-contato" data-id="${c.id}" title="Editar contato" style="padding: 4px 6px;">
+                      <span class="material-symbols-outlined" style="font-size: 15px;">edit</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm btn-excluir-contato" data-id="${c.id}" title="Remover contato" style="padding: 4px 6px; color: var(--color-danger, #ef4444);">
+                      <span class="material-symbols-outlined" style="font-size: 15px;">delete</span>
+                    </button>
+                  </div>
+                ` : ''}
               </div>
 
               <div class="contact-card-body">
@@ -252,8 +262,8 @@ export async function renderVisaoGeral(container) {
 
         if (confirm(`Deseja remover o vínculo do contato "${c.nome}" com este projeto?`)) {
           const { currentUser } = getState();
-          await ContatosService.excluirContato(id, currentUser);
-          showToast(`Contato "${c.nome}" removido.`, 'info');
+          await ContatosService.excluirContato(id, currentUser, projeto.id);
+          showToast(`Contato "${c.nome}" removido deste projeto.`, 'info');
           const atualizados = await ContatosService.listarPorProjeto(projeto.id);
           renderContatos(atualizados);
         }
@@ -263,69 +273,119 @@ export async function renderVisaoGeral(container) {
 
   renderContatos(contatos);
 
-  // Dirty State Guard nos inputs do projeto
+  // Dirty State Guard nos inputs do projeto e limpeza de erros inline
   const formProjeto = container.querySelector('#form-visao-geral');
   formProjeto.querySelectorAll('input, textarea').forEach(el => {
-    el.addEventListener('input', () => setDirty(true));
+    el.addEventListener('input', () => {
+      setDirty(true);
+      el.classList.remove('is-invalid');
+      const errEl = container.querySelector(`#err-${el.id}`);
+      if (errEl) errEl.style.display = 'none';
+    });
   });
 
   // Gravar Informações do Projeto
   const btnGravarProjeto = container.querySelector('#btn-gravar-info-projeto');
-  btnGravarProjeto.addEventListener('click', async () => {
-    const nome = container.querySelector('#vg-nome').value.trim();
-    if (!nome) {
-      showToast('O nome do projeto é obrigatório.', 'warning');
-      return;
-    }
+  if (btnGravarProjeto) {
+    btnGravarProjeto.addEventListener('click', async () => {
+      const inputNome = container.querySelector('#vg-nome');
+      const inputFim = container.querySelector('#vg-fim');
+      const errNome = container.querySelector('#err-vg-nome');
+      const errFim = container.querySelector('#err-vg-fim');
 
-    const entesRaw = container.querySelector('#vg-entes').value;
-    const entesExternos = entesRaw ? entesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-    const areasDetranEnvolvidas = selectedAreasList;
+      const nome = inputNome.value.trim();
+      if (!nome) {
+        inputNome.classList.add('is-invalid');
+        if (errNome) {
+          errNome.textContent = 'O nome do projeto é obrigatório.';
+          errNome.style.display = 'block';
+        }
+        showToast('O nome do projeto é obrigatório.', 'warning');
+        return;
+      }
 
-    const dataInicio = container.querySelector('#vg-inicio').value.trim();
-    const previsaoEncerramento = container.querySelector('#vg-fim').value.trim();
-    const objetivo = container.querySelector('#vg-objetivo').value.trim();
-    const escopo = container.querySelector('#vg-escopo').value.trim();
+      const dataInicio = container.querySelector('#vg-inicio').value.trim();
+      const previsaoEncerramento = inputFim.value.trim();
 
-    try {
-      btnGravarProjeto.disabled = true;
-      btnGravarProjeto.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span> Gravando...`;
+      try {
+        ProjetosService.validarDatas(dataInicio, previsaoEncerramento);
+      } catch (errData) {
+        inputFim.classList.add('is-invalid');
+        if (errFim) {
+          errFim.textContent = errData.message;
+          errFim.style.display = 'block';
+        }
+        showToast(errData.message, 'warning');
+        return;
+      }
 
-      const { currentUser } = getState();
-      const payload = {
-        ...projeto,
-        nome,
-        nome_projeto: nome,
-        objetivo,
-        escopo,
-        dataInicio,
-        previsaoEncerramento,
-        entesExternos,
-        areasDetranEnvolvidas
-      };
+      const entesRaw = container.querySelector('#vg-entes').value;
+      const entesExternos = entesRaw ? entesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const areasDetranEnvolvidas = selectedAreasList;
+      const objetivo = container.querySelector('#vg-objetivo').value.trim();
+      const escopo = container.querySelector('#vg-escopo').value.trim();
 
-      const salvo = await ProjetosService.salvarProjeto(payload, currentUser);
-      setActiveProject(salvo);
-      setDirty(false);
-      showToast('Informações do projeto gravadas com sucesso!', 'success');
-      
-      // Re-renderiza a view com os dados salvos
-      renderVisaoGeral(container);
-    } catch (err) {
-      showToast(err.message || 'Erro ao gravar informações.', 'danger');
-      btnGravarProjeto.disabled = false;
-      btnGravarProjeto.innerHTML = `<span class="material-symbols-outlined">save</span> Gravar Informações`;
-    }
-  });
+      try {
+        btnGravarProjeto.disabled = true;
+        btnGravarProjeto.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span> Gravando...`;
 
-  // Modal Novo / Editar Contato
-  const abrirModalContato = (contatoExistente = null) => {
+        const { currentUser } = getState();
+        const payload = {
+          ...projeto,
+          nome,
+          nome_projeto: nome,
+          objetivo,
+          escopo,
+          dataInicio,
+          previsaoEncerramento,
+          entesExternos,
+          areasDetranEnvolvidas
+        };
+
+        const salvo = await ProjetosService.salvarProjeto(payload, currentUser);
+        setActiveProject(salvo);
+        setDirty(false);
+        showToast('Informações do projeto gravadas com sucesso!', 'success');
+        
+        // Re-renderiza a view com os dados salvos
+        renderVisaoGeral(container);
+      } catch (err) {
+        showToast(err.message || 'Erro ao gravar informações.', 'danger');
+        btnGravarProjeto.disabled = false;
+        btnGravarProjeto.innerHTML = `<span class="material-symbols-outlined">save</span> Gravar Informações`;
+      }
+    });
+  }
+
+  // Modal Novo / Editar Contato com integração CRM
+  const abrirModalContato = async (contatoExistente = null) => {
     const isEdicao = !!contatoExistente;
+    let contatoCrmSelecionadoId = null;
+
+    // Busca todos os contatos do CRM para permitir seleção prévia
+    const todosContatosCrm = await ContatosService.listarTodos();
+
     const content = `
       <form id="form-contato-modal" style="display: flex; flex-direction: column; gap: 14px;">
+        ${!isEdicao ? `
+          <div style="background: var(--bg-hover-subtle); padding: 12px; border-radius: var(--radius-button); border: 1px solid var(--border-color); margin-bottom: 4px;">
+            <label class="form-label" for="mc-select-crm" style="font-weight: 600; margin-bottom: 4px;">
+              Importar da Base Central de Contatos (CRM)
+            </label>
+            <select id="mc-select-crm" class="form-select">
+              <option value="">-- Selecione para preencher ou vincular --</option>
+              ${todosContatosCrm.map(tc => `
+                <option value="${tc.id}">${tc.nome} (${tc.email}) - ${tc.area || tc.cargo || 'Sem área'}</option>
+              `).join('')}
+            </select>
+            <span class="form-hint" style="font-size: 11px; margin-top: 4px;">Selecione um contato para importar ou preencha os campos abaixo para cadastrar um novo.</span>
+          </div>
+        ` : ''}
+
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label" for="mc-nome">Nome Completo <span class="required">*</span></label>
           <input type="text" id="mc-nome" class="form-input" required value="${contatoExistente?.nome || ''}" placeholder="Ex: Maria dos Santos">
+          <span class="form-error-msg" id="err-mc-nome" style="display: none;"></span>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -336,22 +396,25 @@ export async function renderVisaoGeral(container) {
 
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="mc-area">Área / Entidade <span class="required">*</span></label>
-            <select id="mc-area" class="form-select" required>
-              <option value="">-- Selecionar --</option>
-              ${areasInstitucionais.map(a => `
-                <option value="${a}" ${a === contatoExistente?.area ? 'selected' : ''}>${a}</option>
-              `).join('')}
-              <option value="CET" ${contatoExistente?.area === 'CET' ? 'selected' : ''}>CET</option>
-              <option value="DER" ${contatoExistente?.area === 'DER' ? 'selected' : ''}>DER</option>
-              <option value="Outro Ente Externo" ${contatoExistente?.area === 'Outro Ente Externo' ? 'selected' : ''}>Outro Ente Externo</option>
-            </select>
+            <input type="text" id="mc-area" list="mc-areas-datalist" class="form-input" required value="${contatoExistente?.area || ''}" placeholder="Digite ou selecione a área/órgão (ex: DIST, CET, DER)">
+            <datalist id="mc-areas-datalist">
+              ${areasInstitucionais.map(a => `<option value="${a}">`).join('')}
+              <option value="CET">
+              <option value="DER">
+              <option value="Polícia Rodoviária">
+              <option value="Prodesp">
+              <option value="Poupatempo">
+              <option value="Secretaria da Fazenda">
+            </datalist>
+            <span class="form-error-msg" id="err-mc-area" style="display: none;"></span>
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="mc-email">E-mail <span class="required">*</span></label>
+            <label class="form-label" for="mc-email">E-mail Institucional <span class="required">*</span></label>
             <input type="email" id="mc-email" class="form-input" required value="${contatoExistente?.email || ''}" placeholder="nome@detran.sp.gov.br">
+            <span class="form-error-msg" id="err-mc-email" style="display: none;"></span>
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
@@ -373,30 +436,86 @@ export async function renderVisaoGeral(container) {
       title: isEdicao ? 'Editar Ponto Focal' : 'Cadastrar Ponto Focal',
       content,
       footerHtml,
-      maxWidth: '520px'
+      maxWidth: '540px'
     });
+
+    // Seletor CRM
+    const selectCrm = modal.querySelector('#mc-select-crm');
+    if (selectCrm) {
+      selectCrm.addEventListener('change', () => {
+        const crmId = selectCrm.value;
+        if (!crmId) {
+          contatoCrmSelecionadoId = null;
+          return;
+        }
+        const crm = todosContatosCrm.find(c => c.id === crmId);
+        if (crm) {
+          contatoCrmSelecionadoId = crm.id;
+          modal.querySelector('#mc-nome').value = crm.nome || '';
+          modal.querySelector('#mc-cargo').value = crm.cargo || '';
+          modal.querySelector('#mc-area').value = crm.area || '';
+          modal.querySelector('#mc-email').value = crm.email || '';
+          modal.querySelector('#mc-tel').value = crm.telefone || '';
+        }
+      });
+    }
 
     modal.querySelector('#btn-mc-cancelar').addEventListener('click', closeModal);
 
     modal.querySelector('#btn-mc-salvar').addEventListener('click', async () => {
-      const nome = modal.querySelector('#mc-nome').value.trim();
-      const cargo = modal.querySelector('#mc-cargo').value.trim();
-      const area = modal.querySelector('#mc-area').value;
-      const email = modal.querySelector('#mc-email').value.trim();
-      const telefone = modal.querySelector('#mc-tel').value.trim();
+      const inputNome = modal.querySelector('#mc-nome');
+      const inputArea = modal.querySelector('#mc-area');
+      const inputEmail = modal.querySelector('#mc-email');
+      const errNome = modal.querySelector('#err-mc-nome');
+      const errArea = modal.querySelector('#err-mc-area');
+      const errEmail = modal.querySelector('#err-mc-email');
 
+      let hasError = false;
+
+      const nome = inputNome.value.trim();
       if (!nome) {
-        showToast('O nome do contato é obrigatório.', 'warning');
-        return;
+        inputNome.classList.add('is-invalid');
+        if (errNome) {
+          errNome.textContent = 'O nome do contato é obrigatório.';
+          errNome.style.display = 'block';
+        }
+        hasError = true;
       }
+
+      const area = inputArea.value.trim();
       if (!area) {
-        showToast('Selecione a área do contato.', 'warning');
-        return;
+        inputArea.classList.add('is-invalid');
+        if (errArea) {
+          errArea.textContent = 'A área ou entidade é obrigatória.';
+          errArea.style.display = 'block';
+        }
+        hasError = true;
       }
+
+      const email = inputEmail.value.trim();
       if (!email) {
-        showToast('O e-mail é obrigatório.', 'warning');
+        inputEmail.classList.add('is-invalid');
+        if (errEmail) {
+          errEmail.textContent = 'O e-mail é obrigatório.';
+          errEmail.style.display = 'block';
+        }
+        hasError = true;
+      } else if (!ContatosService.validarEmail(email)) {
+        inputEmail.classList.add('is-invalid');
+        if (errEmail) {
+          errEmail.textContent = 'E-mail com formato inválido.';
+          errEmail.style.display = 'block';
+        }
+        hasError = true;
+      }
+
+      if (hasError) {
+        showToast('Preencha os campos obrigatórios corretamente.', 'warning');
         return;
       }
+
+      const cargo = modal.querySelector('#mc-cargo').value.trim();
+      const telefone = modal.querySelector('#mc-tel').value.trim();
 
       try {
         const { currentUser } = getState();
@@ -410,10 +529,20 @@ export async function renderVisaoGeral(container) {
         };
 
         if (isEdicao) {
-          await ContatosService.atualizarContato(contatoExistente.id, payload, currentUser);
+          await ContatosService.salvarContato({
+            ...contatoExistente,
+            ...payload,
+            id: contatoExistente.id
+          }, currentUser);
           showToast('Contato atualizado com sucesso!', 'success');
+        } else if (contatoCrmSelecionadoId) {
+          await ContatosService.salvarContato({
+            ...payload,
+            id: contatoCrmSelecionadoId
+          }, currentUser);
+          showToast('Contato vinculado ao projeto com sucesso!', 'success');
         } else {
-          await ContatosService.criarContato(payload, currentUser);
+          await ContatosService.salvarContato(payload, currentUser);
           showToast('Contato associado ao projeto com sucesso!', 'success');
         }
 

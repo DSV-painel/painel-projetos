@@ -29,6 +29,26 @@ export function normalizarProjeto(p) {
   };
 }
 
+/**
+ * Formata datas ISO (YYYY-MM-DD) para DD/MM/AAAA ou identifica períodos estimados como previsão
+ * Conforme Seção 4: "Para períodos estimados, identificar que se trata de previsão"
+ * @param {string} valor
+ * @returns {{ texto: string, isPrevisao: boolean }}
+ */
+export function formatarDataOuPeriodo(valor) {
+  if (!valor || !String(valor).trim()) {
+    return { texto: '—', isPrevisao: false };
+  }
+  const str = String(valor).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const dt = new Date(str + 'T00:00:00');
+    if (!isNaN(dt.getTime())) {
+      return { texto: dt.toLocaleDateString('pt-BR'), isPrevisao: false };
+    }
+  }
+  return { texto: str, isPrevisao: true };
+}
+
 export const ProjetosService = {
   /**
    * Valida coerência de datas do projeto
