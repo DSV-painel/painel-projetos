@@ -76,6 +76,35 @@ describe('Serviço de Contatos e Pontos Focais (Seção 4)', () => {
     expect(norm.projetosIds).toEqual(['proj_01', 'proj_02']);
   });
 
+  it('deve extrair nome de contatos do CRM com chaves alternativas e aplicar fallback inteligente do e-mail', () => {
+    // 1. Chaves alternativas de nome
+    expect(normalizarContato({ nome_contato: 'Marcos Oliveira', email: 'marcos@cetsp.com.br' }).nome).toBe('Marcos Oliveira');
+    expect(normalizarContato({ nomeContato: 'Lucas Silva', email: 'lucas@sp.gov.br' }).nome).toBe('Lucas Silva');
+    expect(normalizarContato({ nome_completo: 'Carlos Eduardo', email: 'carlos@der.sp.gov.br' }).nome).toBe('Carlos Eduardo');
+    expect(normalizarContato({ nomeCompleto: 'Mariana Duarte', email: 'mariana@der.sp.gov.br' }).nome).toBe('Mariana Duarte');
+    expect(normalizarContato({ contato: 'Beatriz Lima', email: 'beatriz@der.sp.gov.br' }).nome).toBe('Beatriz Lima');
+    expect(normalizarContato({ Contato: 'Gabriel Ramos', email: 'gabriel@detran.sp.gov.br' }).nome).toBe('Gabriel Ramos');
+    expect(normalizarContato({ name: 'Patricia Santos', email: 'patricia@sp.gov.br' }).nome).toBe('Patricia Santos');
+    expect(normalizarContato({ responsavel: 'Fernando Rocha', email: 'fernando@der.sp.gov.br' }).nome).toBe('Fernando Rocha');
+    expect(normalizarContato({ responsavel: { nome: 'Roberta Dias' }, email: 'roberta@der.sp.gov.br' }).nome).toBe('Roberta Dias');
+    expect(normalizarContato({ identificacao: 'Tatiane Costa', email: 'tatiane@detran.sp.gov.br' }).nome).toBe('Tatiane Costa');
+    expect(normalizarContato({ dados: { nome: 'Renato Souza' }, email: 'renato@detran.sp.gov.br' }).nome).toBe('Renato Souza');
+    expect(normalizarContato({ perfil: { nome: 'Vanessa Alcantara' }, email: 'vanessa@detran.sp.gov.br' }).nome).toBe('Vanessa Alcantara');
+
+    // 2. Chave com espaço em branco deve ignorar e buscar próxima ou fallback
+    expect(normalizarContato({ nome: '   ', nome_contato: 'Luciana Mello' }).nome).toBe('Luciana Mello');
+
+    // 3. Fallback inteligente a partir do e-mail
+    expect(normalizarContato({ email: 'ana.paula.ferreira@der.sp.gov.br' }).nome).toBe('Ana Paula Ferreira');
+    expect(normalizarContato({ email_institucional: 'carlos_eduardo@cetsp.com.br' }).nome).toBe('Carlos Eduardo');
+    expect(normalizarContato({ email: 'maria-clara@sp.gov.br' }).nome).toBe('Maria Clara');
+    expect(normalizarContato({ Email: 'joao@detran.sp.gov.br' }).nome).toBe('Joao');
+
+    // 4. Sem nome e sem e-mail
+    expect(normalizarContato({}).nome).toBe('Contato Institucional');
+    expect(normalizarContato({ cargo: 'Analista' }).nome).toBe('Contato Institucional');
+  });
+
   it('deve vincular contato existente da base CRM a múltiplos projetos', async () => {
     const contatoBase = await ContatosService.salvarContato({
       projetoId: 'proj_02',

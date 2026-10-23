@@ -20,13 +20,37 @@ export function normalizarContato(c) {
   if (!c) return null;
   const email = (c.email || c.email_institucional || c.Email || c.mail || '').trim().toLowerCase();
 
-  let nome = (
-    c.nome || c.Nome || c.nome_contato || c.nomeContato ||
-    c.nome_completo || c.nomeCompleto || c.contato || c.Contato ||
-    c.name || c.responsavel || c.identificacao ||
-    c.dados?.nome || c.perfil?.nome || ''
-  ).trim();
+  // 1. Extração ampla de chaves possíveis da base CRM (/contatos)
+  const candidatosNome = [
+    c.nome,
+    c.Nome,
+    c.nome_contato,
+    c.nomeContato,
+    c.nome_completo,
+    c.nomeCompleto,
+    c.contato,
+    c.Contato,
+    c.name,
+    c.responsavel,
+    c.identificacao,
+    c.dados?.nome,
+    c.perfil?.nome
+  ];
 
+  let nome = '';
+  for (const cand of candidatosNome) {
+    if (typeof cand === 'string' && cand.trim().length > 0) {
+      nome = cand.trim();
+      break;
+    }
+  }
+
+  // Se responsavel for objeto com nome
+  if (!nome && c.responsavel && typeof c.responsavel === 'object' && typeof c.responsavel.nome === 'string' && c.responsavel.nome.trim()) {
+    nome = c.responsavel.nome.trim();
+  }
+
+  // 2. Fallback inteligente a partir do prefixo do e-mail institucional
   if (!nome && email) {
     const prefix = email.split('@')[0] || '';
     const partes = prefix.split(/[._-]/).filter(Boolean);
