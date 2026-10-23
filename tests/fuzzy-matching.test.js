@@ -166,7 +166,21 @@ describe('Busca e Seleção Fuzzy de Entidades / Órgãos (buscarEntidadesFuzzy)
 
 describe('Serviço de Entidades e Integração com /entidades (EntidadesService)', () => {
   it('deve normalizar entidade vinda da coleção /entidades em vários formatos', () => {
-    // Objeto do painel-rsv com sigla e nome
+    // Objeto oficial do Firestore do painel-rsv / painel-crm
+    const docFirestoreRsv = {
+      id: 'doc_123',
+      id_entidade: 'P-0012',
+      sigla_entidade: 'ARTESP',
+      nome_entidade: 'Agência Reguladora de Serviços Públicos Delegados de Transporte do Estado de São Paulo',
+      descricao_entidade: 'Regulamentar e fiscalizar serviços públicos de transportes estaduais.'
+    };
+    const eRsv = EntidadesService.normalizarEntidade(docFirestoreRsv);
+    expect(eRsv.sigla).toBe('ARTESP');
+    expect(eRsv.nome).toContain('ARTESP - Agência Reguladora');
+    expect(eRsv.descricao).toBe('Regulamentar e fiscalizar serviços públicos de transportes estaduais.');
+    expect(eRsv.tipo).toBe(''); // Não deve gerar 'Conveniada' fake
+
+    // Objeto com sigla e nome
     const e1 = EntidadesService.normalizarEntidade({ sigla: 'CET', nome: 'CET - Companhia de Engenharia de Tráfego', tipo: 'Municipal' });
     expect(e1.sigla).toBe('CET');
     expect(e1.nome).toBe('CET - Companhia de Engenharia de Tráfego');

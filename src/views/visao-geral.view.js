@@ -668,23 +668,38 @@ export async function renderVisaoGeral(container) {
       if (resultados.length > 0) {
         html += resultados.slice(0, 8).map(r => `
           <div class="area-fuzzy-item" data-area-val="${r.nome}" style="padding: 9px 12px; border-bottom: 1px solid var(--border-color-light); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; transition: background 0.15s ease;">
-            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-              <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-primary); flex-shrink: 0;">apartment</span>
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-primary); flex-shrink: 0;">apartment</span>
               <div style="min-width: 0;">
-                <span style="color: var(--text-main); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">${r.nome}</span>
-                ${r.tipo ? `<span style="font-size: 10px; color: var(--text-muted);">${r.tipo}</span>` : ''}
+                <div style="color: var(--text-main); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px;">
+                  ${r.nome}
+                </div>
+                ${r.descricao && r.descricao !== r.nome ? `
+                  <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 440px;">
+                    ${r.descricao}
+                  </div>
+                ` : (r.tipo ? `
+                  <div style="font-size: 10.5px; color: var(--text-muted);">
+                    ${r.tipo}
+                  </div>
+                ` : '')}
               </div>
             </div>
-            ${r.motivo && r.motivo !== 'Listagem geral' ? `
-              <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; flex-shrink: 0;">${r.motivo}</span>
-            ` : ''}
+            <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+              ${r.sigla ? `
+                <span class="badge badge-neutral" style="font-size: 10px; padding: 2px 6px; font-weight: 700;">${r.sigla}</span>
+              ` : ''}
+              ${r.motivo && r.motivo !== 'Listagem geral' && r.motivo !== 'Sigla correspondente' ? `
+                <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px;">${r.motivo}</span>
+              ` : ''}
+            </div>
           </div>
         `).join('');
       }
 
       if (queryTrim && !todasEntidades.some(e => e.nome.toLowerCase() === queryTrim.toLowerCase() || (e.sigla && e.sigla.toLowerCase() === queryTrim.toLowerCase()))) {
         html += `
-          <div class="area-fuzzy-item area-fuzzy-custom" data-area-val="${queryTrim}" style="padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-primary); background: var(--bg-hover-subtle); border-top: 1px dashed var(--border-color);">
+          <div class="area-fuzzy-item area-fuzzy-custom" data-area-val="${queryTrim}" style="padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-primary); background: var(--bg-hover-subtle); border-top: 1px dashed var(--border-color);">
             <span class="material-symbols-outlined" style="font-size: 16px;">add_circle</span>
             <span>Usar "<strong>${queryTrim}</strong>" como nova área/entidade</span>
           </div>
