@@ -367,6 +367,9 @@ export async function renderVisaoGeral(container) {
 
     const content = `
       <form id="form-contato-modal" style="display: flex; flex-direction: column; gap: 14px;">
+        <!-- Banner de sugestão por Fuzzy Matching / Detecção de Mesma Pessoa -->
+        <div id="mc-fuzzy-alert" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #1e40af;"></div>
+
         ${!isEdicao ? `
           <div style="background: var(--bg-hover-subtle); padding: 12px; border-radius: var(--radius-button); border: 1px solid var(--border-color); margin-bottom: 4px;">
             <label class="form-label" for="mc-select-crm" style="font-weight: 600; margin-bottom: 4px;">
@@ -459,6 +462,66 @@ export async function renderVisaoGeral(container) {
         }
       });
     }
+
+    // Detecção de Contato Similar / Mesma Pessoa via Fuzzy Matching
+    let debounceTimer = null;
+    const fuzzyAlert = modal.querySelector('#mc-fuzzy-alert');
+
+    const checarSimilaridade = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (isEdicao || contatoCrmSelecionadoId) {
+          if (fuzzyAlert) fuzzyAlert.style.display = 'none';
+          return;
+        }
+
+        const nome = modal.querySelector('#mc-nome').value.trim();
+        const email = modal.querySelector('#mc-email').value.trim();
+        const area = modal.querySelector('#mc-area').value.trim();
+        const telefone = modal.querySelector('#mc-tel').value.trim();
+
+        if (nome.length < 3 && !email) {
+          if (fuzzyAlert) fuzzyAlert.style.display = 'none';
+          return;
+        }
+
+        const resultado = ContatosService.detectarContatoSimilar({ nome, email, area, telefone }, todosContatosCrm);
+
+        if (resultado.similar && resultado.contato) {
+          const c = resultado.contato;
+          fuzzyAlert.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+              <div>
+                <strong style="color: #1e3a8a;">Contato similar identificado na base central:</strong>
+                <div style="margin-top: 2px;"><strong>${c.nome}</strong> (${c.email}) - ${c.area || 'Sem área'}</div>
+                <div style="font-size: 11px; color: #3b82f6; margin-top: 2px;">${resultado.motivo}</div>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm" id="btn-vincular-fuzzy-sugerido" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;">
+                Vincular
+              </button>
+            </div>
+          `;
+          fuzzyAlert.style.display = 'block';
+
+          modal.querySelector('#btn-vincular-fuzzy-sugerido')?.addEventListener('click', () => {
+            contatoCrmSelecionadoId = c.id;
+            modal.querySelector('#mc-nome').value = c.nome || '';
+            modal.querySelector('#mc-cargo').value = c.cargo || '';
+            modal.querySelector('#mc-area').value = c.area || '';
+            modal.querySelector('#mc-email').value = c.email || '';
+            modal.querySelector('#mc-tel').value = c.telefone || '';
+            fuzzyAlert.style.display = 'none';
+            if (selectCrm) selectCrm.value = c.id;
+            showToast(`Dados de "${c.nome}" vinculados.`, 'info');
+          });
+        } else {
+          if (fuzzyAlert) fuzzyAlert.style.display = 'none';
+        }
+      }, 300);
+    };
+
+    modal.querySelector('#mc-nome').addEventListener('input', checarSimilaridade);
+    modal.querySelector('#mc-email').addEventListener('input', checarSimilaridade);
 
     modal.querySelector('#btn-mc-cancelar').addEventListener('click', closeModal);
 

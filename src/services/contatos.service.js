@@ -5,6 +5,7 @@
  */
 import { StorageAdapter } from './storage-adapter.js';
 import { AuditService } from './audit.service.js';
+import { compararNomesFuzzy, normalizarTextoParaComparacao } from '../utils/fuzzy-match.util.js';
 
 const COLLECTION = 'contatos';
 
@@ -17,11 +18,32 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export function normalizarContato(c) {
   if (!c) return null;
-  const nome = c.nome || c.Nome || 'Sem nome';
-  const email = (c.email || c.email_institucional || c.Email || '').trim().toLowerCase();
-  const cargo = c.cargo || c.Cargo || c.funcao || '';
-  const area = c.area || c.setor || c.Setor || c.entidade || c.orgao || '';
-  const telefone = c.telefone || c.celular || c.Telefone || '';
+  const email = (c.email || c.email_institucional || c.Email || c.mail || '').trim().toLowerCase();
+
+  let nome = (
+    c.nome || c.Nome || c.nome_contato || c.nomeContato ||
+    c.nome_completo || c.nomeCompleto || c.contato || c.Contato ||
+    c.name || c.responsavel || c.identificacao ||
+    c.dados?.nome || c.perfil?.nome || ''
+  ).trim();
+
+  if (!nome && email) {
+    const prefix = email.split('@')[0] || '';
+    const partes = prefix.split(/[._-]/).filter(Boolean);
+    if (partes.length > 0) {
+      nome = partes
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(' ');
+    }
+  }
+
+  if (!nome) {
+    nome = 'Contato Institucional';
+  }
+
+  const cargo = c.cargo || c.Cargo || c.funcao || c.papel || '';
+  const area = c.area || c.setor || c.Setor || c.entidade || c.orgao || c.lotacao || '';
+  const telefone = c.telefone || c.celular || c.Telefone || c.ramal || '';
   const projetosIds = Array.isArray(c.projetosIds)
     ? c.projetosIds
     : (c.projetoId ? [c.projetoId] : []);
@@ -47,6 +69,97 @@ export const ContatosService = {
   validarEmail(email) {
     if (!email || typeof email !== 'string') return false;
     return EMAIL_REGEX.test(email.trim());
+  },
+
+  /**
+   * Detecta se os dados de um contato sendo digitado coincidem com algum contato já cadastrado
+   * (mesma pessoa via e-mail ou fuzzy matching de nome e setor/telefone)
+   * @param {{ nome?: string, email?: string, area?: string, telefone?: string }} dados
+   * @param {Array<Object>} listaContatos
+   * @returns {{ similar: boolean, contato: Object|null, confianca: number, motivo: string }}
+   */
+  detectarContatoSimilar(dados, listaContatos = []) {
+    if (!dados || !Array.isArray(listaContatos) || listaContatos.length === 0) {
+      return { similar: false, contato: null, confianca: 0, motivo: '' };
+    }
+
+    const emailInput = (dados.email || '').trim().toLowerCase();
+    const nomeInput = (dados.nome || '').trim();
+    const areaInput = normalizarTextoParaComparacao(dados.area || dados.setor || dados.orgao || '');
+    const telInput = (dados.telefone || dados.celular || '').replace(/\D/g, '');
+
+    // Critério 1: Mesmo e-mail (100% certeza de mesma pessoa)
+    if (emailInput && this.validarEmail(emailInput)) {
+      const matchEmail = listaContatos.find(c => {
+        const cEmail = (c.email || c.email_institucional || '').trim().toLowerCase();
+        return cEmail === emailInput;
+      });
+      if (matchEmail) {
+        return {
+          similar: true,
+          contato: matchEmail,
+          confianca: 1.0,
+          motivo: `E-mail idêntico ao contato cadastrado "${matchEmail.nome}".`
+        };
+      }
+    }
+
+    // Critério 2 e 3: Fuzzy matching no nome
+    const nomeNorm = normalizarTextoParaComparacao(nomeInput);
+    if (nomeNorm.length >= 3) {
+      let melhorMatchCriterio2 = null;
+      let melhorScoreCriterio2 = 0;
+      let melhorMotivoCriterio2 = '';
+
+      let melhorMatchCriterio3 = null;
+      let melhorScoreCriterio3 = 0;
+      let melhorMotivoCriterio3 = '';
+
+      for (const c of listaContatos) {
+        if (!c.nome) continue;
+        const score = compararNomesFuzzy(nomeInput, c.nome);
+
+        // Se nome similar >= 85% e mesma área ou mesmo telefone
+        const cArea = normalizarTextoParaComparacao(c.area || c.setor || c.orgao || '');
+        const cTel = (c.telefone || c.celular || '').replace(/\D/g, '');
+        const mesmaArea = areaInput.length >= 2 && cArea.length >= 2 && (areaInput.includes(cArea) || cArea.includes(areaInput));
+        const mesmoTel = telInput.length >= 8 && cTel.length >= 8 && (telInput.endsWith(cTel) || cTel.endsWith(telInput));
+
+        if (score >= 0.85 && (mesmaArea || mesmoTel)) {
+          if (score > melhorScoreCriterio2) {
+            melhorScoreCriterio2 = score;
+            melhorMatchCriterio2 = c;
+            melhorMotivoCriterio2 = `Alta similaridade de nome (${Math.round(score * 100)}%) com mesma ${mesmoTel ? 'linha telefônica' : 'área/órgão'}.`;
+          }
+        } else if (score >= 0.82) {
+          if (score > melhorScoreCriterio3) {
+            melhorScoreCriterio3 = score;
+            melhorMatchCriterio3 = c;
+            melhorMotivoCriterio3 = `Similaridade de nome (${Math.round(score * 100)}%) com contato já existente.`;
+          }
+        }
+      }
+
+      if (melhorMatchCriterio2) {
+        return {
+          similar: true,
+          contato: melhorMatchCriterio2,
+          confianca: melhorScoreCriterio2,
+          motivo: melhorMotivoCriterio2
+        };
+      }
+
+      if (melhorMatchCriterio3) {
+        return {
+          similar: true,
+          contato: melhorMatchCriterio3,
+          confianca: melhorScoreCriterio3,
+          motivo: melhorMotivoCriterio3
+        };
+      }
+    }
+
+    return { similar: false, contato: null, confianca: 0, motivo: '' };
   },
 
   /**
