@@ -49,16 +49,16 @@ export async function renderProjetos(container) {
     </div>
 
     <!-- Tabela de Projetos -->
-    <div class="table-responsive">
+    <div class="table-responsive table-responsive-projetos">
       <table class="data-table" id="tabela-projetos">
         <thead>
           <tr>
             <th>Nome do Projeto</th>
             <th>Área Gestora</th>
             <th>Entes Externos</th>
-            <th>Módulo DIST</th>
+            <th style="text-align: center;">Módulo DIST</th>
             <th>Vigência / Cronograma</th>
-            <th style="text-align: right;">Ações</th>
+            <th style="text-align: center;">Ações</th>
           </tr>
         </thead>
         <tbody id="tbody-projetos">
@@ -89,44 +89,52 @@ export async function renderProjetos(container) {
       const inicioHtml = `${inicioObj.texto}${inicioObj.isPrevisao && inicioObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size:9px; padding: 1px 4px;">Previsão</span>' : ''}`;
       const fimHtml = `${fimObj.texto}${fimObj.isPrevisao && fimObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size:9px; padding: 1px 4px;">Previsão</span>' : ''}`;
 
+      // Limita a exibição da descrição abaixo do nome para no máximo 55 caracteres, evitando poluição visual e estouro de layout
+      const descCompleta = p.descricao || p.objetivo || 'Sem descrição informada';
+      const descCurta = descCompleta.length > 55 ? `${descCompleta.substring(0, 55).trim()}...` : descCompleta;
+
       return `
         <tr class="${isAtivo ? 'row-active' : ''}" data-row-id="${p.id}" style="cursor: pointer;" title="Clique na linha para expandir detalhes">
           <td>
-            <div style="font-weight: var(--font-weight-bold); color: var(--text-main); font-size: 13.5px;">
-              ${p.nome}
-              ${isAtivo ? '<span class="badge badge-primary" style="margin-left: 6px; font-size: 10px;">Ativo</span>' : ''}
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+              <span style="font-weight: var(--font-weight-bold); color: var(--text-main); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;" title="${p.nome}">
+                ${p.nome}
+              </span>
+              ${isAtivo ? '<span class="badge badge-primary" style="font-size: 10px; flex-shrink: 0;">Ativo</span>' : ''}
             </div>
-            <div style="font-size: 11.5px; color: var(--text-muted); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${p.descricao || p.objetivo || 'Sem descrição informada'}
+            <div style="font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;" title="${descCompleta}">
+              ${descCurta}
             </div>
           </td>
-          <td><span class="tag">${p.areaGestora || 'DSV'}</span></td>
-          <td style="max-width: 160px; font-size: 12px; color: var(--text-secondary);">${entesTexto}</td>
-          <td>
+          <td><span class="tag" title="${p.areaGestora || 'DSV'}">${p.areaGestora || 'DSV'}</span></td>
+          <td style="font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${entesTexto}">${entesTexto}</td>
+          <td style="text-align: center;">
             <span class="badge ${p.distHabilitado ? 'badge-success' : 'badge-neutral'}">
               ${p.distHabilitado ? 'Habilitado' : 'Desabilitado'}
             </span>
           </td>
-          <td style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">
+          <td style="font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             ${inicioHtml} <span style="color: var(--text-muted);">até</span> ${fimHtml}
           </td>
-          <td style="text-align: right; white-space: nowrap;">
-            <button type="button" class="btn btn-secondary btn-sm btn-detalhes-projeto" data-id="${p.id}" title="Expandir detalhes completos">
-              <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
-            </button>
-            <button type="button" class="btn ${isAtivo ? 'btn-primary' : 'btn-outline'} btn-sm btn-selecionar-projeto" data-id="${p.id}" title="Tornar este projeto ativo na navegação">
-              <span>${isAtivo ? 'Selecionado' : 'Selecionar'}</span>
-            </button>
-            ${podeEditar ? `
-              <button type="button" class="btn btn-secondary btn-sm btn-editar-projeto" data-id="${p.id}" title="Editar projeto">
-                <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
+          <td style="text-align: center; white-space: nowrap;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+              <button type="button" class="btn btn-secondary btn-sm btn-detalhes-projeto" data-id="${p.id}" title="Expandir detalhes completos">
+                <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
               </button>
-            ` : ''}
-            ${administrador ? `
-              <button type="button" class="btn btn-secondary btn-sm btn-excluir-projeto" data-id="${p.id}" title="Excluir projeto do sistema" style="color: var(--color-danger); margin-left: 4px;">
-                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+              ${podeEditar ? `
+                <button type="button" class="btn btn-secondary btn-sm btn-editar-projeto" data-id="${p.id}" title="Editar projeto">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
+                </button>
+              ` : ''}
+              ${administrador ? `
+                <button type="button" class="btn btn-secondary btn-sm btn-excluir-projeto" data-id="${p.id}" title="Excluir projeto do sistema" style="color: var(--color-danger);">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+                </button>
+              ` : ''}
+              <button type="button" class="btn ${isAtivo ? 'btn-primary' : 'btn-outline'} btn-sm btn-selecionar-projeto" data-id="${p.id}" title="Tornar este projeto ativo na navegação">
+                <span>${isAtivo ? 'Selecionado' : 'Selecionar'}</span>
               </button>
-            ` : ''}
+            </div>
           </td>
         </tr>
       `;
