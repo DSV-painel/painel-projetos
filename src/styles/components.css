@@ -340,7 +340,7 @@
 
 #tabela-projetos th:nth-child(1),
 #tabela-projetos td:nth-child(1) {
-  width: 27%;
+  width: 35%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -348,7 +348,7 @@
 
 #tabela-projetos th:nth-child(2),
 #tabela-projetos td:nth-child(2) {
-  width: 12%;
+  width: 10%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -371,7 +371,7 @@
 
 #tabela-projetos th:nth-child(5),
 #tabela-projetos td:nth-child(5) {
-  width: 14%;
+  width: 13%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -379,9 +379,9 @@
 
 #tabela-projetos th:nth-child(6),
 #tabela-projetos td:nth-child(6) {
-  width: 22%;
-  min-width: 210px;
-  text-align: right;
+  width: 17%;
+  min-width: 185px;
+  text-align: center;
   white-space: nowrap;
 }
 

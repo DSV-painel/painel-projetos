@@ -58,7 +58,7 @@ export async function renderProjetos(container) {
             <th>Entes Externos</th>
             <th style="text-align: center;">Módulo DIST</th>
             <th>Vigência / Cronograma</th>
-            <th style="text-align: right;">Ações</th>
+            <th style="text-align: center;">Ações</th>
           </tr>
         </thead>
         <tbody id="tbody-projetos">
@@ -116,8 +116,8 @@ export async function renderProjetos(container) {
           <td style="font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             ${inicioHtml} <span style="color: var(--text-muted);">até</span> ${fimHtml}
           </td>
-          <td style="text-align: right; white-space: nowrap;">
-            <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px;">
+          <td style="text-align: center; white-space: nowrap;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
               <button type="button" class="btn btn-secondary btn-sm btn-detalhes-projeto" data-id="${p.id}" title="Expandir detalhes completos">
                 <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
               </button>
