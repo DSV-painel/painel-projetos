@@ -243,6 +243,20 @@ const INITIAL_DATA = {
       projetoId: 'proj_01',
       detalhes: 'Diagnóstico DIST atualizado para "Requer Atenção".'
     }
+  ],
+  entidades: [
+    { id: 'ent_01', sigla: 'CET', nome: 'CET - Companhia de Engenharia de Tráfego', tipo: 'Conveniada / Municipal' },
+    { id: 'ent_02', sigla: 'DER', nome: 'DER - Departamento de Estradas de Rodagem', tipo: 'Estadual / Infraestrutura' },
+    { id: 'ent_03', sigla: 'PMRv', nome: 'PMRv - Polícia Militar Rodoviária', tipo: 'Segurança Pública' },
+    { id: 'ent_04', sigla: 'Prodesp', nome: 'Prodesp - Cia de Processamento de Dados do Estado de SP', tipo: 'Tecnologia' },
+    { id: 'ent_05', sigla: 'Poupatempo', nome: 'Poupatempo', tipo: 'Atendimento ao Cidadão' },
+    { id: 'ent_06', sigla: 'Sefaz', nome: 'Sefaz - Secretaria da Fazenda e Planejamento', tipo: 'Secretaria Estadual' },
+    { id: 'ent_07', sigla: 'Semil', nome: 'Semil - Secretaria de Meio Ambiente, Infraestrutura e Logística', tipo: 'Secretaria Estadual' },
+    { id: 'ent_08', sigla: 'Artesp', nome: 'Artesp - Agência de Transporte do Estado de SP', tipo: 'Agência Reguladora' },
+    { id: 'ent_09', sigla: 'PRF', nome: 'PRF - Polícia Rodoviária Federal', tipo: 'Federal' },
+    { id: 'ent_10', sigla: 'DIST', nome: 'DIST - Divisão de Integração Setorial', tipo: 'Interna Detran-SP' },
+    { id: 'ent_11', sigla: 'DTI', nome: 'DTI - Diretoria de Tecnologia da Informação', tipo: 'Interna Detran-SP' },
+    { id: 'ent_12', sigla: 'DSV', nome: 'DSV - Diretoria de Segurança Veicular', tipo: 'Interna Detran-SP' }
   ]
 };
 
@@ -267,7 +281,7 @@ const safeStorage = {
 
 // Inicializa dados no storage se ainda não existirem
 function initLocalStore() {
-  ['projetos', 'diagnosticos', 'riscos', 'contatos', 'historico'].forEach(key => {
+  ['projetos', 'diagnosticos', 'riscos', 'contatos', 'historico', 'entidades'].forEach(key => {
     const storageKey = LOCAL_STORAGE_PREFIX + key;
     if (!safeStorage.getItem(storageKey)) {
       safeStorage.setItem(storageKey, JSON.stringify(INITIAL_DATA[key]));

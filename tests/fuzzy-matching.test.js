@@ -7,6 +7,7 @@ import {
   buscarEntidadesFuzzy
 } from '../src/utils/fuzzy-match.util.js';
 import { ContatosService } from '../src/services/contatos.service.js';
+import { EntidadesService } from '../src/services/entidades.service.js';
 
 describe('Utilitário de Fuzzy Matching (src/utils/fuzzy-match.util.js)', () => {
   it('deve normalizar texto removendo acentos, pontuações e stop-words', () => {
@@ -160,5 +161,50 @@ describe('Busca e Seleção Fuzzy de Entidades / Órgãos (buscarEntidadesFuzzy)
   it('deve retornar lista completa quando termo for vazio', () => {
     const res = buscarEntidadesFuzzy('', entidadesExemplo);
     expect(res.length).toBe(entidadesExemplo.length);
+  });
+});
+
+describe('Serviço de Entidades e Integração com /entidades (EntidadesService)', () => {
+  it('deve normalizar entidade vinda da coleção /entidades em vários formatos', () => {
+    // Objeto do painel-rsv com sigla e nome
+    const e1 = EntidadesService.normalizarEntidade({ sigla: 'CET', nome: 'CET - Companhia de Engenharia de Tráfego', tipo: 'Municipal' });
+    expect(e1.sigla).toBe('CET');
+    expect(e1.nome).toBe('CET - Companhia de Engenharia de Tráfego');
+    expect(e1.tipo).toBe('Municipal');
+
+    // String simples
+    const e2 = EntidadesService.normalizarEntidade('DER - Departamento de Estradas de Rodagem');
+    expect(e2.sigla).toBe('DER');
+    expect(e2.nome).toBe('DER - Departamento de Estradas de Rodagem');
+
+    // Objeto com formato alternativo (razao_social e categoria)
+    const e3 = EntidadesService.normalizarEntidade({ Sigla: 'PRODESP', razao_social: 'Cia de Processamento de Dados', categoria: 'Estadual' });
+    expect(e3.sigla).toBe('PRODESP');
+    expect(e3.nome).toBe('PRODESP - Cia de Processamento de Dados');
+    expect(e3.tipo).toBe('Estadual');
+  });
+
+  it('deve listar todas as entidades mesclando base e diretorias internas Detran-SP', async () => {
+    const todas = await EntidadesService.listarTodas();
+    expect(Array.isArray(todas)).toBe(true);
+    expect(todas.length).toBeGreaterThanOrEqual(10);
+
+    // Deve conter entidades externas conhecidas da coleção /entidades
+    const nomes = todas.map(e => e.nome);
+    expect(nomes.some(n => n.includes('CET'))).toBe(true);
+    expect(nomes.some(n => n.includes('DER'))).toBe(true);
+
+    // Deve conter áreas internas do Detran-SP
+    expect(nomes.some(n => n.includes('DIST'))).toBe(true);
+    expect(nomes.some(n => n.includes('DTI'))).toBe(true);
+  });
+
+  it('deve realizar busca fuzzy na lista de entidades com campos enriquecidos', async () => {
+    const todas = await EntidadesService.listarTodas();
+    const busca = EntidadesService.buscarFuzzy('CET', todas);
+    expect(busca.length).toBeGreaterThan(0);
+    expect(busca[0].nome).toContain('CET');
+    expect(busca[0].score).toBe(1.0);
+    expect(busca[0].motivo).toBe('Sigla correspondente');
   });
 });
