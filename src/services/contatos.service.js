@@ -5,6 +5,7 @@
  */
 import { StorageAdapter } from './storage-adapter.js';
 import { AuditService } from './audit.service.js';
+import { compararNomesFuzzy, normalizarTextoParaComparacao } from '../utils/fuzzy-match.util.js';
 
 const COLLECTION = 'contatos';
 
@@ -95,6 +96,97 @@ export const ContatosService = {
   },
 
   /**
+   * Detecta se os dados de um contato sendo digitado coincidem com algum contato já cadastrado
+   * (mesma pessoa via e-mail ou fuzzy matching de nome e setor/telefone)
+   * @param {{ nome?: string, email?: string, area?: string, telefone?: string }} dados
+   * @param {Array<Object>} listaContatos
+   * @returns {{ similar: boolean, contato: Object|null, confianca: number, motivo: string }}
+   */
+  detectarContatoSimilar(dados, listaContatos = []) {
+    if (!dados || !Array.isArray(listaContatos) || listaContatos.length === 0) {
+      return { similar: false, contato: null, confianca: 0, motivo: '' };
+    }
+
+    const emailInput = (dados.email || '').trim().toLowerCase();
+    const nomeInput = (dados.nome || '').trim();
+    const areaInput = normalizarTextoParaComparacao(dados.area || dados.setor || dados.orgao || '');
+    const telInput = (dados.telefone || dados.celular || '').replace(/\D/g, '');
+
+    // Critério 1: Mesmo e-mail (100% certeza de mesma pessoa)
+    if (emailInput && this.validarEmail(emailInput)) {
+      const matchEmail = listaContatos.find(c => {
+        const cEmail = (c.email || c.email_institucional || '').trim().toLowerCase();
+        return cEmail === emailInput;
+      });
+      if (matchEmail) {
+        return {
+          similar: true,
+          contato: matchEmail,
+          confianca: 1.0,
+          motivo: `E-mail idêntico ao contato cadastrado "${matchEmail.nome}".`
+        };
+      }
+    }
+
+    // Critério 2 e 3: Fuzzy matching no nome
+    const nomeNorm = normalizarTextoParaComparacao(nomeInput);
+    if (nomeNorm.length >= 3) {
+      let melhorMatchCriterio2 = null;
+      let melhorScoreCriterio2 = 0;
+      let melhorMotivoCriterio2 = '';
+
+      let melhorMatchCriterio3 = null;
+      let melhorScoreCriterio3 = 0;
+      let melhorMotivoCriterio3 = '';
+
+      for (const c of listaContatos) {
+        if (!c.nome) continue;
+        const score = compararNomesFuzzy(nomeInput, c.nome);
+
+        // Se nome similar >= 85% e mesma área ou mesmo telefone
+        const cArea = normalizarTextoParaComparacao(c.area || c.setor || c.orgao || '');
+        const cTel = (c.telefone || c.celular || '').replace(/\D/g, '');
+        const mesmaArea = areaInput.length >= 2 && cArea.length >= 2 && (areaInput.includes(cArea) || cArea.includes(areaInput));
+        const mesmoTel = telInput.length >= 8 && cTel.length >= 8 && (telInput.endsWith(cTel) || cTel.endsWith(telInput));
+
+        if (score >= 0.85 && (mesmaArea || mesmoTel)) {
+          if (score > melhorScoreCriterio2) {
+            melhorScoreCriterio2 = score;
+            melhorMatchCriterio2 = c;
+            melhorMotivoCriterio2 = `Alta similaridade de nome (${Math.round(score * 100)}%) com mesma ${mesmoTel ? 'linha telefônica' : 'área/órgão'}.`;
+          }
+        } else if (score >= 0.82) {
+          if (score > melhorScoreCriterio3) {
+            melhorScoreCriterio3 = score;
+            melhorMatchCriterio3 = c;
+            melhorMotivoCriterio3 = `Similaridade de nome (${Math.round(score * 100)}%) com contato já existente.`;
+          }
+        }
+      }
+
+      if (melhorMatchCriterio2) {
+        return {
+          similar: true,
+          contato: melhorMatchCriterio2,
+          confianca: melhorScoreCriterio2,
+          motivo: melhorMotivoCriterio2
+        };
+      }
+
+      if (melhorMatchCriterio3) {
+        return {
+          similar: true,
+          contato: melhorMatchCriterio3,
+          confianca: melhorScoreCriterio3,
+          motivo: melhorMotivoCriterio3
+        };
+      }
+    }
+
+    return { similar: false, contato: null, confianca: 0, motivo: '' };
+  },
+
+  /**
    * Lista todos os contatos da Base Central /contatos
    * @returns {Promise<Array>}
    */
@@ -155,7 +247,10 @@ export const ContatosService = {
       throw new Error(`O e-mail "${contato.email}" já está cadastrado para o contato "${duplicado.nome}" neste projeto.`);
     }
 
-    const novosProjetosIds = Array.from(new Set([...contato.projetosIds, projetoId]));
+    const projetosAtuais = Array.isArray(contato.projetosIds) 
+      ? contato.projetosIds 
+      : (contato.projetoId ? [contato.projetoId] : []);
+    const novosProjetosIds = Array.from(new Set([...projetosAtuais, projetoId]));
     const now = new Date().toISOString();
     const payload = {
       ...contato,

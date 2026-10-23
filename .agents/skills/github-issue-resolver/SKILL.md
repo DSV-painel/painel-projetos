@@ -29,10 +29,10 @@ Siga rigorosamente as instruções abaixo ao resolver uma ou mais GitHub Issues 
    - Crie agentes paralelos (subagentes) para a resolução das issues, permitindo trabalho simultâneo e isolado (por exemplo, ao lidar com múltiplas issues ou investigações paralelas).
    - Cada agente deve operar em seu contexto/branch respectivo.
 
-4. **Não Fazer Commits Após a Resolução**:
-   - **NÃO faça commits após a resolução da issue**.
-   - Deixe todas as alterações nos arquivos pendentes no diretório de trabalho (*working directory*) da branch específica, para que o usuário possa inspecionar e revisar via `git status` / `git diff`.
-   - **NUNCA** execute `git commit` ou `git push` após a resolução sem autorização explícita do usuário.
+4. **Commits Locais Permitidos (Sem Push)**:
+   - Realize commits locais na branch específica após a resolução e aprovação dos testes automatizados, utilizando mensagens convencionais e descritivas (ex: `feat: ... (#<numero>)` ou `fix: ... (#<numero>)`).
+   - O commit local preserva as alterações na branch correspondente e viabiliza a remoção limpa dos worktrees dos subagentes, permitindo que o usuário faça `git checkout <branch>` diretamente no diretório principal do projeto.
+   - **NUNCA** execute `git push` para o repositório remoto sem autorização explícita do usuário.
 
 5. **Tutorial para Verificação das Alterações**:
    - Sempre forneça um tutorial detalhado, passo a passo, orientando o usuário na validação manual das alterações:
