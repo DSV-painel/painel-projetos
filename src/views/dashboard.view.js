@@ -122,12 +122,13 @@ export async function renderDashboard(container) {
               <th>Entes Externos</th>
               <th>Módulo DIST</th>
               <th>Situação (Diagnóstico)</th>
-              <th style="text-align: center;">Riscos</th>
+              <th style="text-align: center; width: 100px;">Qtd. Riscos</th>
+              <th style="text-align: center; width: 140px;">Criticidade</th>
               <th style="text-align: right;">Ação</th>
             </tr>
           </thead>
           <tbody id="tbody-dashboard-projects">
-            <tr><td colspan="6" style="text-align: center; padding: 24px;">Carregando projetos...</td></tr>
+            <tr><td colspan="7" style="text-align: center; padding: 24px;">Carregando projetos...</td></tr>
           </tbody>
         </table>
       </div>
@@ -273,12 +274,25 @@ export async function renderDashboard(container) {
   // Renderiza Tabela de Projetos no Dashboard
   const tbody = document.getElementById('tbody-dashboard-projects');
   if (projetos.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">Nenhum projeto cadastrado no momento.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Nenhum projeto cadastrado no momento.</td></tr>`;
   } else {
     tbody.innerHTML = projetos.map(p => {
       const diag = diagMap.get(p.id);
       const riscosProj = riscos.filter(r => r.projetoId === p.id);
       const countAltosProj = riscosProj.filter(r => r.classificacao === 'Alto').length;
+      const countModeradosProj = riscosProj.filter(r => r.classificacao === 'Moderado').length;
+
+      let criticidadeBadge = '<span class="badge badge-neutral">Sem riscos</span>';
+      if (riscosProj.length === 0) {
+        criticidadeBadge = '<span class="badge badge-neutral">Sem riscos</span>';
+      } else if (countAltosProj > 0) {
+        criticidadeBadge = `<span class="badge badge-danger">${countAltosProj} Alto(s)</span>`;
+      } else if (countModeradosProj > 0) {
+        criticidadeBadge = `<span class="badge badge-warning">${countModeradosProj} Moderado(s)</span>`;
+      } else {
+        criticidadeBadge = '<span class="badge badge-success">Baixo</span>';
+      }
+
       const entesTexto = Array.isArray(p.entesExternos) && p.entesExternos.length > 0 ? p.entesExternos.join(', ') : 'Não informado';
 
       let diagBadge = '<span class="badge badge-neutral">Pendente</span>';
@@ -311,7 +325,9 @@ export async function renderDashboard(container) {
           <td>${diagBadge}</td>
           <td style="text-align: center;">
             <span style="font-weight: var(--font-weight-semibold);">${riscosProj.length}</span>
-            ${countAltosProj > 0 ? `<span class="badge badge-danger" style="margin-left: 6px; font-size: 10px;">${countAltosProj} altos</span>` : ''}
+          </td>
+          <td style="text-align: center;">
+            ${criticidadeBadge}
           </td>
           <td style="text-align: right;">
             <button type="button" class="btn btn-secondary btn-sm btn-open-project" data-proj-id="${p.id}">
