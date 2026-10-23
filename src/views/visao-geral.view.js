@@ -357,13 +357,15 @@ export async function renderVisaoGeral(container) {
     });
   }
 
-  // Modal Novo / Editar Contato com integração CRM
+  // Modal Novo / Editar Contato com integração CRM (Seleção com Pesquisa e Ação Direta de Vínculo)
   const abrirModalContato = async (contatoExistente = null) => {
     const isEdicao = !!contatoExistente;
     let contatoCrmSelecionadoId = null;
 
-    // Busca todos os contatos do CRM para permitir seleção prévia
+    // Busca todos os contatos do CRM para pesquisa e seleção prévia
     const todosContatosCrm = await ContatosService.listarTodos();
+    const idsJaVinculados = new Set(contatos.map(c => c.id));
+    const emailsJaVinculados = new Set(contatos.map(c => c.email?.toLowerCase()).filter(Boolean));
 
     const content = `
       <form id="form-contato-modal" style="display: flex; flex-direction: column; gap: 14px;">
@@ -371,17 +373,53 @@ export async function renderVisaoGeral(container) {
         <div id="mc-fuzzy-alert" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #1e40af;"></div>
 
         ${!isEdicao ? `
-          <div style="background: var(--bg-hover-subtle); padding: 12px; border-radius: var(--radius-button); border: 1px solid var(--border-color); margin-bottom: 4px;">
-            <label class="form-label" for="mc-select-crm" style="font-weight: 600; margin-bottom: 4px;">
-              Importar da Base Central de Contatos (CRM)
-            </label>
-            <select id="mc-select-crm" class="form-select">
-              <option value="">-- Selecione para preencher ou vincular --</option>
-              ${todosContatosCrm.map(tc => `
-                <option value="${tc.id}">${tc.nome} (${tc.email}) - ${tc.area || tc.cargo || 'Sem área'}</option>
-              `).join('')}
-            </select>
-            <span class="form-hint" style="font-size: 11px; margin-top: 4px;">Selecione um contato para importar ou preencha os campos abaixo para cadastrar um novo.</span>
+          <!-- Seleção com Pesquisa integrada à Base Central de Contatos (Padrão CRM) -->
+          <div style="background: var(--bg-hover-subtle); padding: 12px 14px; border-radius: var(--radius-button); border: 1px solid var(--border-color); margin-bottom: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="font-weight: 600; margin-bottom: 0;">
+                Pesquisar na Base Central de Contatos (CRM)
+              </label>
+              <span class="badge badge-neutral" style="font-size: 10px;">${todosContatosCrm.length} contatos globais</span>
+            </div>
+            
+            <div style="position: relative;">
+              <div style="display: flex; align-items: center; position: relative;">
+                <span class="material-symbols-outlined" style="position: absolute; left: 10px; font-size: 18px; color: var(--text-muted); pointer-events: none;">search</span>
+                <input type="text" id="mc-crm-search" class="form-input" placeholder="Digite nome, e-mail, cargo ou órgão para buscar..." style="padding-left: 36px; padding-right: 32px;" autocomplete="off">
+                <button type="button" id="mc-crm-clear" style="display: none; position: absolute; right: 8px; background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Limpar busca">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
+                </button>
+              </div>
+
+              <!-- Dropdown Flutuante de Resultados da Busca -->
+              <div id="mc-crm-dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--bg-card, #ffffff); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); max-height: 220px; overflow-y: auto; z-index: 1050;"></div>
+            </div>
+
+            <!-- Card de Contato Selecionado do CRM (com botão de vínculo direto em 1 clique) -->
+            <div id="mc-crm-selected-box" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px; margin-top: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <div style="min-width: 0; flex: 1;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="material-symbols-outlined" style="color: #16a34a; font-size: 17px;">verified</span>
+                    <strong id="mc-sel-nome" style="color: #15803d; font-size: 13px;"></strong>
+                    <span class="badge badge-success" style="font-size: 9.5px; padding: 2px 6px;">Base Central</span>
+                  </div>
+                  <div id="mc-sel-detalhes" style="font-size: 11.5px; color: #166534; margin-top: 2px;"></div>
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
+                  <button type="button" class="btn btn-sm btn-primary" id="btn-mc-vincular-direto" style="padding: 5px 10px; font-size: 11.5px; font-weight: 600;">
+                    <span class="material-symbols-outlined" style="font-size: 15px;">link</span> Vincular ao Projeto
+                  </button>
+                  <button type="button" class="btn btn-sm btn-secondary" id="btn-mc-limpar-selecao" style="padding: 5px 8px; font-size: 11.5px;" title="Remover seleção">
+                    Trocar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <span class="form-hint" style="font-size: 11px; margin-top: 6px; display: block;">
+              Selecione um contato existente para vincular em 1 clique ou preencha o formulário abaixo para criar um novo.
+            </span>
           </div>
         ` : ''}
 
@@ -439,27 +477,148 @@ export async function renderVisaoGeral(container) {
       title: isEdicao ? 'Editar Ponto Focal' : 'Cadastrar Ponto Focal',
       content,
       footerHtml,
-      maxWidth: '540px'
+      maxWidth: '560px'
     });
 
-    // Seletor CRM
-    const selectCrm = modal.querySelector('#mc-select-crm');
-    if (selectCrm) {
-      selectCrm.addEventListener('change', () => {
-        const crmId = selectCrm.value;
-        if (!crmId) {
-          contatoCrmSelecionadoId = null;
+    // Função de vínculo direto imediato com feedback claro
+    const executarVinculoImediato = async (contatoId, nomeContato) => {
+      try {
+        const { currentUser } = getState();
+        await ContatosService.vincularContatoExistente(contatoId, projeto.id, currentUser);
+        showToast(`Contato "${nomeContato}" vinculado com sucesso ao projeto!`, 'success');
+        closeModal();
+        const atualizados = await ContatosService.listarPorProjeto(projeto.id);
+        renderContatos(atualizados);
+      } catch (err) {
+        showToast(err.message || 'Erro ao vincular contato ao projeto.', 'danger');
+      }
+    };
+
+    // Componente de Seleção com Pesquisa da Base Central (CRM)
+    const crmSearchInput = modal.querySelector('#mc-crm-search');
+    const crmDropdown = modal.querySelector('#mc-crm-dropdown');
+    const crmClearBtn = modal.querySelector('#mc-crm-clear');
+    const selectedBox = modal.querySelector('#mc-crm-selected-box');
+    const selNome = modal.querySelector('#mc-sel-nome');
+    const selDetalhes = modal.querySelector('#mc-sel-detalhes');
+    const btnVincularDireto = modal.querySelector('#btn-mc-vincular-direto');
+    const btnLimparSelecao = modal.querySelector('#btn-mc-limpar-selecao');
+
+    const preencherFormularioComContato = (c) => {
+      contatoCrmSelecionadoId = c.id;
+      modal.querySelector('#mc-nome').value = c.nome || '';
+      modal.querySelector('#mc-cargo').value = c.cargo || '';
+      modal.querySelector('#mc-area').value = c.area || '';
+      modal.querySelector('#mc-email').value = c.email || '';
+      modal.querySelector('#mc-tel').value = c.telefone || '';
+
+      if (selectedBox && selNome && selDetalhes) {
+        selNome.textContent = c.nome;
+        selDetalhes.textContent = `${c.email} • ${c.cargo ? `${c.cargo} • ` : ''}${c.area || 'Sem área'}`;
+        selectedBox.style.display = 'block';
+      }
+      if (crmDropdown) crmDropdown.style.display = 'none';
+      if (crmSearchInput) crmSearchInput.value = c.nome;
+      if (crmClearBtn) crmClearBtn.style.display = 'block';
+    };
+
+    const limparSelecaoCrm = () => {
+      contatoCrmSelecionadoId = null;
+      if (selectedBox) selectedBox.style.display = 'none';
+      if (crmSearchInput) {
+        crmSearchInput.value = '';
+        crmSearchInput.focus();
+      }
+      if (crmClearBtn) crmClearBtn.style.display = 'none';
+      if (crmDropdown) crmDropdown.style.display = 'none';
+    };
+
+    btnLimparSelecao?.addEventListener('click', limparSelecaoCrm);
+    crmClearBtn?.addEventListener('click', limparSelecaoCrm);
+
+    btnVincularDireto?.addEventListener('click', async () => {
+      if (contatoCrmSelecionadoId) {
+        const crm = todosContatosCrm.find(x => x.id === contatoCrmSelecionadoId);
+        await executarVinculoImediato(contatoCrmSelecionadoId, crm?.nome || 'Contato');
+      }
+    });
+
+    if (crmSearchInput && crmDropdown) {
+      crmSearchInput.addEventListener('input', () => {
+        const query = crmSearchInput.value.trim().toLowerCase();
+        crmClearBtn.style.display = query ? 'block' : 'none';
+
+        if (query.length < 2) {
+          crmDropdown.style.display = 'none';
+          crmDropdown.innerHTML = '';
           return;
         }
-        const crm = todosContatosCrm.find(c => c.id === crmId);
-        if (crm) {
-          contatoCrmSelecionadoId = crm.id;
-          modal.querySelector('#mc-nome').value = crm.nome || '';
-          modal.querySelector('#mc-cargo').value = crm.cargo || '';
-          modal.querySelector('#mc-area').value = crm.area || '';
-          modal.querySelector('#mc-email').value = crm.email || '';
-          modal.querySelector('#mc-tel').value = crm.telefone || '';
+
+        const filtrados = todosContatosCrm.filter(c => {
+          const nome = (c.nome || '').toLowerCase();
+          const email = (c.email || '').toLowerCase();
+          const cargo = (c.cargo || '').toLowerCase();
+          const area = (c.area || '').toLowerCase();
+          return nome.includes(query) || email.includes(query) || cargo.includes(query) || area.includes(query);
+        }).slice(0, 8);
+
+        if (filtrados.length === 0) {
+          crmDropdown.innerHTML = `
+            <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+              Nenhum contato encontrado no CRM com "<strong>${query}</strong>".<br>
+              <span style="font-size: 11px;">Preencha os campos abaixo para cadastrá-lo como novo.</span>
+            </div>
+          `;
+          crmDropdown.style.display = 'block';
+          return;
         }
+
+        crmDropdown.innerHTML = filtrados.map(c => {
+          const jaVinculado = idsJaVinculados.has(c.id) || emailsJaVinculados.has(c.email?.toLowerCase());
+          const iniciais = (c.nome || 'C').split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('');
+
+          return `
+            <div class="crm-search-item" data-crm-id="${c.id}" style="padding: 9px 12px; border-bottom: 1px solid var(--border-color-light); cursor: ${jaVinculado ? 'default' : 'pointer'}; display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: background 0.15s ease;">
+              <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--color-primary-light, #e8f1fb); color: var(--color-primary, #0f5cab); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">
+                  ${iniciais}
+                </div>
+                <div style="min-width: 0;">
+                  <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${c.nome}
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${c.email} ${c.area ? `• ${c.area}` : ''}
+                  </div>
+                </div>
+              </div>
+              <div style="flex-shrink: 0;">
+                ${jaVinculado ? `
+                  <span class="badge badge-neutral" style="font-size: 10px;">Já no projeto</span>
+                ` : `
+                  <button type="button" class="btn btn-outline btn-sm btn-selecionar-item-crm" data-crm-id="${c.id}" style="padding: 3px 8px; font-size: 11px;">
+                    Selecionar
+                  </button>
+                `}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        crmDropdown.style.display = 'block';
+
+        crmDropdown.querySelectorAll('.crm-search-item').forEach(item => {
+          const crmId = item.getAttribute('data-crm-id');
+          const jaVinculado = idsJaVinculados.has(crmId);
+          if (jaVinculado) return;
+
+          item.addEventListener('mouseenter', () => item.style.backgroundColor = 'var(--bg-hover, #f1f5f9)');
+          item.addEventListener('mouseleave', () => item.style.backgroundColor = 'transparent');
+          item.addEventListener('click', () => {
+            const c = todosContatosCrm.find(x => x.id === crmId);
+            if (c) preencherFormularioComContato(c);
+          });
+        });
       });
     }
 
@@ -489,30 +648,33 @@ export async function renderVisaoGeral(container) {
 
         if (resultado.similar && resultado.contato) {
           const c = resultado.contato;
+          const jaNoProjeto = idsJaVinculados.has(c.id) || emailsJaVinculados.has(c.email?.toLowerCase());
+
           fuzzyAlert.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-              <div>
-                <strong style="color: #1e3a8a;">Contato similar identificado na base central:</strong>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <div style="min-width: 0;">
+                <strong style="color: #1e3a8a; display: flex; align-items: center; gap: 4px;">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">info</span>
+                  Contato similar identificado na Base Central (CRM):
+                </strong>
                 <div style="margin-top: 2px;"><strong>${c.nome}</strong> (${c.email}) - ${c.area || 'Sem área'}</div>
                 <div style="font-size: 11px; color: #3b82f6; margin-top: 2px;">${resultado.motivo}</div>
               </div>
-              <button type="button" class="btn btn-primary btn-sm" id="btn-vincular-fuzzy-sugerido" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;">
-                Vincular
-              </button>
+              <div style="flex-shrink: 0;">
+                ${jaNoProjeto ? `
+                  <span class="badge badge-neutral">Já cadastrado neste projeto</span>
+                ` : `
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-vincular-fuzzy-sugerido" style="padding: 5px 10px; font-size: 11px; font-weight: 600; white-space: nowrap;" title="Vincular contato ao projeto imediatamente">
+                    <span class="material-symbols-outlined" style="font-size: 14px;">link</span> Vincular este contato
+                  </button>
+                `}
+              </div>
             </div>
           `;
           fuzzyAlert.style.display = 'block';
 
-          modal.querySelector('#btn-vincular-fuzzy-sugerido')?.addEventListener('click', () => {
-            contatoCrmSelecionadoId = c.id;
-            modal.querySelector('#mc-nome').value = c.nome || '';
-            modal.querySelector('#mc-cargo').value = c.cargo || '';
-            modal.querySelector('#mc-area').value = c.area || '';
-            modal.querySelector('#mc-email').value = c.email || '';
-            modal.querySelector('#mc-tel').value = c.telefone || '';
-            fuzzyAlert.style.display = 'none';
-            if (selectCrm) selectCrm.value = c.id;
-            showToast(`Dados de "${c.nome}" vinculados.`, 'info');
+          modal.querySelector('#btn-vincular-fuzzy-sugerido')?.addEventListener('click', async () => {
+            await executarVinculoImediato(c.id, c.nome);
           });
         } else {
           if (fuzzyAlert) fuzzyAlert.style.display = 'none';

@@ -31,8 +31,9 @@ export const firebaseConfig = {
   appId: import.meta.env?.VITE_FIREBASE_APP_ID || "1:1234567890:web:abcdef"
 };
 
-// Verifica se as credenciais são placeholders ou reais
-export const isMockFirebase = !import.meta.env?.VITE_FIREBASE_API_KEY || 
+// Verifica se as credenciais são placeholders ou reais, ou se está em ambiente de teste
+export const isMockFirebase = import.meta.env?.MODE === 'test' ||
+  !import.meta.env?.VITE_FIREBASE_API_KEY || 
   import.meta.env?.VITE_FIREBASE_API_KEY.includes("MOCK");
 
 let app;

@@ -223,7 +223,10 @@ export const ContatosService = {
       throw new Error(`O e-mail "${contato.email}" já está cadastrado para o contato "${duplicado.nome}" neste projeto.`);
     }
 
-    const novosProjetosIds = Array.from(new Set([...contato.projetosIds, projetoId]));
+    const projetosAtuais = Array.isArray(contato.projetosIds) 
+      ? contato.projetosIds 
+      : (contato.projetoId ? [contato.projetoId] : []);
+    const novosProjetosIds = Array.from(new Set([...projetosAtuais, projetoId]));
     const now = new Date().toISOString();
     const payload = {
       ...contato,
