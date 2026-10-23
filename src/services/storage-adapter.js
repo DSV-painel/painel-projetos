@@ -22,7 +22,7 @@ import {
 const LOCAL_STORAGE_PREFIX = 'dist_app_';
 
 // Dados iniciais mockados para demonstração imediata
-const INITIAL_DATA = {
+export const INITIAL_DATA = {
   projetos: [
     {
       id: 'proj_01',
@@ -243,6 +243,227 @@ const INITIAL_DATA = {
       projetoId: 'proj_01',
       detalhes: 'Diagnóstico DIST atualizado para "Requer Atenção".'
     }
+  ],
+  entidades: [
+    {
+      id_entidade: 'P-0001',
+      id: 'P-0001',
+      sigla_entidade: 'DETRAN-SP',
+      sigla: 'DETRAN-SP',
+      nome_entidade: 'Departamento Estadual de Trânsito de São Paulo',
+      nome: 'DETRAN-SP - Departamento Estadual de Trânsito de São Paulo',
+      descricao_entidade: 'Promover educação para o trânsito, planejar, coordenar, executar e controlar ações relacionadas a condutores e veículos.'
+    },
+    {
+      id_entidade: 'P-0002',
+      id: 'P-0002',
+      sigla_entidade: 'CPTran',
+      sigla: 'CPTran',
+      nome_entidade: 'Comando de Policiamento de Trânsito da Polícia Militar de São Paulo',
+      nome: 'CPTran - Comando de Policiamento de Trânsito da PMESP',
+      descricao_entidade: 'Policiamento ostensivo e fiscalização de trânsito urbano na capital e estradas estaduais.'
+    },
+    {
+      id_entidade: 'P-0003',
+      id: 'P-0003',
+      sigla_entidade: 'CBPMSP',
+      sigla: 'CBPMSP',
+      nome_entidade: 'Corpo de Bombeiros da Polícia Militar de São Paulo',
+      nome: 'CBPMSP - Corpo de Bombeiros da PMESP',
+      descricao_entidade: 'Prevenção e combate a incêndios, buscas e salvamentos em sinistros viários.'
+    },
+    {
+      id_entidade: 'P-0004',
+      id: 'P-0004',
+      sigla_entidade: 'DER-SP',
+      sigla: 'DER-SP',
+      nome_entidade: 'Departamento de Estradas de Rodagem do Estado de São Paulo',
+      nome: 'DER-SP - Departamento de Estradas de Rodagem',
+      descricao_entidade: 'Gestão, manutenção e segurança operacional das rodovias estaduais paulistas.'
+    },
+    {
+      id_entidade: 'P-0005',
+      id: 'P-0005',
+      sigla_entidade: 'SEDUC',
+      sigla: 'SEDUC',
+      nome_entidade: 'Secretaria da Educação do Estado de São Paulo',
+      nome: 'SEDUC - Secretaria da Educação do Estado de SP',
+      descricao_entidade: 'Programas educativos e conscientização de segurança viária nas escolas.'
+    },
+    {
+      id_entidade: 'P-0006',
+      id: 'P-0006',
+      sigla_entidade: 'SSPESP',
+      sigla: 'SSPESP',
+      nome_entidade: 'Secretaria de Segurança Pública do Estado de São Paulo',
+      nome: 'SSPESP - Secretaria de Segurança Pública de SP',
+      descricao_entidade: 'Coordenação das forças policiais, fiscalização e perícia de sinistros de trânsito.'
+    },
+    {
+      id_entidade: 'P-0007',
+      id: 'P-0007',
+      sigla_entidade: 'SES',
+      sigla: 'SES',
+      nome_entidade: 'Secretaria de Estado da Saúde de São Paulo',
+      nome: 'SES - Secretaria de Estado da Saúde de SP',
+      descricao_entidade: 'Atendimento pré-hospitalar (SAMU/GRAU), leitos e vigilância de sinistros.'
+    },
+    {
+      id_entidade: 'P-0008',
+      id: 'P-0008',
+      sigla_entidade: 'SC',
+      sigla: 'SC',
+      nome_entidade: 'Secretaria de Comunicação do Estado de São Paulo',
+      nome: 'SC - Secretaria de Comunicação do Estado de SP',
+      descricao_entidade: 'Campanhas de conscientização e comunicação institucional sobre segurança no trânsito.'
+    },
+    {
+      id_entidade: 'P-0009',
+      id: 'P-0009',
+      sigla_entidade: 'PRF',
+      sigla: 'PRF',
+      nome_entidade: 'Polícia Rodoviária Federal',
+      nome: 'PRF - Polícia Rodoviária Federal',
+      descricao_entidade: 'Fiscalização e patrulhamento em rodovias federais.'
+    },
+    {
+      id_entidade: 'P-0010',
+      id: 'P-0010',
+      sigla_entidade: 'PC',
+      sigla: 'PC',
+      nome_entidade: 'Polícia Civil do Estado de São Paulo',
+      nome: 'PC - Polícia Civil do Estado de SP',
+      descricao_entidade: 'Investigação e perícia em crimes e sinistros de trânsito.'
+    },
+    {
+      id_entidade: 'P-0011',
+      id: 'P-0011',
+      sigla_entidade: 'CETRAN-SP',
+      sigla: 'CETRAN-SP',
+      nome_entidade: 'Conselho Estadual de Trânsito',
+      nome: 'CETRAN-SP - Conselho Estadual de Trânsito',
+      descricao_entidade: 'Coordenação e supervisão do Sistema Nacional de Trânsito em SP.'
+    },
+    {
+      id_entidade: 'P-0012',
+      id: 'P-0012',
+      sigla_entidade: 'ARTESP',
+      sigla: 'ARTESP',
+      nome_entidade: 'Agência Reguladora de Serviços Públicos Delegados de Transporte do Estado de São Paulo',
+      nome: 'ARTESP - Agência de Transporte do Estado de SP',
+      descricao_entidade: 'Regulamentação e fiscalização das rodovias concedidas e transportes intermunicipais.'
+    },
+    {
+      id_entidade: 'P-0013',
+      id: 'P-0013',
+      sigla_entidade: 'STM',
+      sigla: 'STM',
+      nome_entidade: 'Secretaria de Transportes Metropolitanos do Estado de São Paulo',
+      nome: 'STM - Secretaria de Transportes Metropolitanos',
+      descricao_entidade: 'Gestão dos sistemas de transporte de alta capacidade (Metrô, CPTM, EMTU).'
+    },
+    {
+      id_entidade: 'P-0014',
+      id: 'P-0014',
+      sigla_entidade: 'SGGD',
+      sigla: 'SGGD',
+      nome_entidade: 'Secretaria de Gestão e Governo Digital',
+      nome: 'SGGD - Secretaria de Gestão e Governo Digital',
+      descricao_entidade: 'Governança digital e modernização dos sistemas de trânsito estaduais.'
+    },
+    {
+      id_entidade: 'P-0015',
+      id: 'P-0015',
+      sigla_entidade: 'CC',
+      sigla: 'CC',
+      nome_entidade: 'Casa Civil do Governo do Estado de São Paulo',
+      nome: 'CC - Casa Civil do Governo de SP',
+      descricao_entidade: 'Articulação governamental e regulamentação de políticas públicas intersetoriais.'
+    },
+    {
+      id_entidade: 'P-0016',
+      id: 'P-0016',
+      sigla_entidade: 'SEMIL',
+      sigla: 'SEMIL',
+      nome_entidade: 'Secretaria do Meio Ambiente, Infraestrutura e Logística',
+      nome: 'SEMIL - Secretaria de Meio Ambiente, Infraestrutura e Logística',
+      descricao_entidade: 'Infraestrutura viária, hidrovias e logística sustentável.'
+    },
+    {
+      id_entidade: 'P-0017',
+      id: 'P-0017',
+      sigla_entidade: 'CET',
+      sigla: 'CET',
+      nome_entidade: 'Companhia de Engenharia de Tráfego de São Paulo',
+      nome: 'CET - Companhia de Engenharia de Tráfego',
+      descricao_entidade: 'Operação, planejamento e fiscalização do trânsito na capital paulista.'
+    },
+    {
+      id_entidade: 'P-0018',
+      id: 'P-0018',
+      sigla_entidade: 'Prodesp',
+      sigla: 'Prodesp',
+      nome_entidade: 'Companhia de Processamento de Dados do Estado de São Paulo',
+      nome: 'Prodesp - Cia de Processamento de Dados de SP',
+      descricao_entidade: 'Soluções de tecnologia e sustentação das bases do Detran e Poupatempo.'
+    },
+    {
+      id_entidade: 'P-0019',
+      id: 'P-0019',
+      sigla_entidade: 'Poupatempo',
+      sigla: 'Poupatempo',
+      nome_entidade: 'Programa Poupatempo - Central de Atendimento ao Cidadão',
+      nome: 'Poupatempo - Central de Atendimento ao Cidadão',
+      descricao_entidade: 'Atendimento descentralizado para emissão de CNH e serviços veiculares.'
+    },
+    {
+      id_entidade: 'P-0020',
+      id: 'P-0020',
+      sigla_entidade: 'SEFAZ',
+      sigla: 'SEFAZ',
+      nome_entidade: 'Secretaria da Fazenda e Planejamento',
+      nome: 'Sefaz - Secretaria da Fazenda e Planejamento',
+      descricao_entidade: 'Gestão de IPVA, taxas e receitas estaduais ligadas a veículos.'
+    },
+    {
+      id_entidade: 'P-0021',
+      id: 'P-0021',
+      sigla_entidade: 'PMRv',
+      sigla: 'PMRv',
+      nome_entidade: 'Polícia Militar Rodoviária de São Paulo',
+      nome: 'PMRv - Polícia Militar Rodoviária',
+      descricao_entidade: 'Fiscalização ostensiva e operações de segurança na malha rodoviária paulista.'
+    },
+    {
+      id_entidade: 'P-0022',
+      id: 'P-0022',
+      sigla_entidade: 'DIST',
+      sigla: 'DIST',
+      nome_entidade: 'Divisão de Integração Setorial',
+      nome: 'DIST - Divisão de Integração Setorial',
+      descricao_entidade: 'Articulação institucional e acompanhamento de projetos estratégicos do Detran-SP.',
+      tipo: 'Interna Detran-SP'
+    },
+    {
+      id_entidade: 'P-0023',
+      id: 'P-0023',
+      sigla_entidade: 'DTI',
+      sigla: 'DTI',
+      nome_entidade: 'Diretoria de Tecnologia da Informação',
+      nome: 'DTI - Diretoria de Tecnologia da Informação',
+      descricao_entidade: 'Gestão e arquitetura tecnológica dos sistemas corporativos do Detran-SP.',
+      tipo: 'Interna Detran-SP'
+    },
+    {
+      id_entidade: 'P-0024',
+      id: 'P-0024',
+      sigla_entidade: 'DSV',
+      sigla: 'DSV',
+      nome_entidade: 'Diretoria de Segurança Veicular',
+      nome: 'DSV - Diretoria de Segurança Veicular',
+      descricao_entidade: 'Regulamentação, engenharia veicular e segurança no trânsito.',
+      tipo: 'Interna Detran-SP'
+    }
   ]
 };
 
@@ -267,7 +488,7 @@ const safeStorage = {
 
 // Inicializa dados no storage se ainda não existirem
 function initLocalStore() {
-  ['projetos', 'diagnosticos', 'riscos', 'contatos', 'historico'].forEach(key => {
+  ['projetos', 'diagnosticos', 'riscos', 'contatos', 'historico', 'entidades'].forEach(key => {
     const storageKey = LOCAL_STORAGE_PREFIX + key;
     if (!safeStorage.getItem(storageKey)) {
       safeStorage.setItem(storageKey, JSON.stringify(INITIAL_DATA[key]));
@@ -280,10 +501,19 @@ initLocalStore();
 function getLocalCollection(collectionName) {
   try {
     const raw = safeStorage.getItem(LOCAL_STORAGE_PREFIX + collectionName);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    // Fallback garantido se a coleção estiver vazia no storage local
+    if (INITIAL_DATA[collectionName]) {
+      safeStorage.setItem(LOCAL_STORAGE_PREFIX + collectionName, JSON.stringify(INITIAL_DATA[collectionName]));
+      return INITIAL_DATA[collectionName];
+    }
+    return [];
   } catch (e) {
     console.error(`Erro ao ler coleção local ${collectionName}:`, e);
-    return [];
+    return INITIAL_DATA[collectionName] || [];
   }
 }
 

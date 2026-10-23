@@ -1,10 +1,13 @@
 /**
  * View: Histórico & Auditoria
- * Trilha de auditoria institucional registrando alterações, autoria e datas
+ * Trilha de auditoria institucional registrando alterações, autoria, datas e governança
  */
 import { AuditService } from '../services/audit.service.js';
+import { ProjetosService } from '../services/projetos.service.js';
 
 export async function renderHistorico(container) {
+  const projetos = await ProjetosService.listarProjetos();
+
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
       <div>
@@ -27,12 +30,22 @@ export async function renderHistorico(container) {
           <span class="material-symbols-outlined" style="position: absolute; left: 10px; top: 11px; color: var(--text-muted); font-size: 18px;">search</span>
         </div>
 
-        <div style="min-width: 180px;">
+        <div style="min-width: 170px;">
+          <select id="filtro-projeto-historico" class="form-select">
+            <option value="todos">Todos os Projetos</option>
+            ${projetos.map(p => `
+              <option value="${p.id}">${p.nome}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div style="min-width: 160px;">
           <select id="filtro-entidade-historico" class="form-select">
             <option value="todas">Todas as Entidades</option>
             <option value="projeto">Projetos</option>
             <option value="diagnostico">Diagnósticos</option>
             <option value="risco">Riscos</option>
+            <option value="contato">Contatos</option>
           </select>
         </div>
       </div>
@@ -74,7 +87,10 @@ export async function renderHistorico(container) {
       SALVAR_DIAGNOSTICO: '<span class="badge badge-warning">Diagnóstico</span>',
       CRIAR_RISCO: '<span class="badge badge-success">Novo Risco</span>',
       EDITAR_RISCO: '<span class="badge badge-primary">Editar Risco</span>',
-      EXCLUIR_RISCO: '<span class="badge badge-danger">Excluir Risco</span>'
+      EXCLUIR_RISCO: '<span class="badge badge-danger">Excluir Risco</span>',
+      CRIAR_CONTATO: '<span class="badge badge-success">Criar Contato</span>',
+      EDITAR_CONTATO: '<span class="badge badge-primary">Editar Contato</span>',
+      EXCLUIR_CONTATO: '<span class="badge badge-danger">Remover Contato</span>'
     };
 
     tbody.innerHTML = lista.map(item => {
@@ -108,6 +124,7 @@ export async function renderHistorico(container) {
   const filtrarLogs = () => {
     const termo = container.querySelector('#filtro-busca-historico')?.value.toLowerCase().trim() || '';
     const entidade = container.querySelector('#filtro-entidade-historico')?.value || 'todas';
+    const projetoFiltro = container.querySelector('#filtro-projeto-historico')?.value || 'todos';
 
     return logs.filter(l => {
       const matchTermo = !termo ||
@@ -116,8 +133,9 @@ export async function renderHistorico(container) {
         l.acao?.toLowerCase().includes(termo);
 
       const matchEntidade = entidade === 'todas' || l.entidade === entidade;
+      const matchProjeto = projetoFiltro === 'todos' || l.projetoId === projetoFiltro;
 
-      return matchTermo && matchEntidade;
+      return matchTermo && matchEntidade && matchProjeto;
     });
   };
 
@@ -126,6 +144,10 @@ export async function renderHistorico(container) {
   });
 
   container.querySelector('#filtro-entidade-historico').addEventListener('change', () => {
+    renderTabela(filtrarLogs());
+  });
+
+  container.querySelector('#filtro-projeto-historico').addEventListener('change', () => {
     renderTabela(filtrarLogs());
   });
 

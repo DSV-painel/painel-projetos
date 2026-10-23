@@ -4,14 +4,14 @@
  * - Informações básicas de todos os projetos da DSV, independentemente do módulo DIST
  * - Nome do projeto, Área gestora, Descrição resumida e Ativação do módulo DIST
  */
-import { getState, setActiveProject, setDirty, canConfigureDist } from '../store/state.js';
+import { getState, setActiveProject, setDirty, canConfigureDist, canEdit } from '../store/state.js';
 import { ProjetosService } from '../services/projetos.service.js';
 import { showToast } from '../components/toast.component.js';
 import { getAreasInstitucionais } from '../config/areas-institucionais.js';
+import { renderProjectContextCard, attachProjectContextCardEvents } from '../components/project-context.component.js';
 
 export async function renderInfoGerais(container) {
   const { activeProject } = getState();
-  const podeConfigurarDist = canConfigureDist();
   const areasDisponiveis = getAreasInstitucionais();
 
   // Se não houver projeto ativo selecionado, exibe tela para criar ou selecionar
@@ -30,14 +30,15 @@ export async function renderInfoGerais(container) {
         <p style="color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; margin-bottom: 24px;">
           Nenhum projeto está selecionado no momento. Você pode iniciar o cadastro básico de um novo projeto institucional preenchendo as informações gerais abaixo.
         </p>
-        <button type="button" class="btn btn-primary" id="btn-iniciar-novo-proj">
-          <span class="material-symbols-outlined">add</span> Iniciar Novo Projeto
-        </button>
+        ${canEdit() ? `
+          <button type="button" class="btn btn-primary" id="btn-iniciar-novo-proj">
+            <span class="material-symbols-outlined">add</span> Iniciar Novo Projeto
+          </button>
+        ` : '<p style="color: var(--text-muted); font-size: 13px;">Seu perfil possui permissão apenas de leitura.</p>'}
       </div>
     `;
 
     container.querySelector('#btn-iniciar-novo-proj')?.addEventListener('click', () => {
-      // Inicia com um rascunho de novo projeto
       renderFormulario(container, {
         nome: '',
         areaGestora: areasDisponiveis[0] || 'DSV - Diretoria de Segurança Veicular',
@@ -58,13 +59,17 @@ export async function renderInfoGerais(container) {
 function renderFormulario(container, projeto) {
   const isNovo = !!projeto.isNovo;
   const podeConfigurarDist = canConfigureDist();
+  const podeEditar = canEdit();
   const areasDisponiveis = getAreasInstitucionais();
 
   container.innerHTML = `
+    <!-- Card de Contexto do Projeto Ativo (apenas para projetos existentes) -->
+    ${!isNovo ? renderProjectContextCard(projeto, { showEditButton: false }) : ''}
+
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
       <div>
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-          <h1 class="page-title">${isNovo ? 'Cadastrar Novo Projeto' : projeto.nome}</h1>
+          <h1 class="page-title">${isNovo ? 'Cadastrar Novo Projeto' : 'Editar Informações Gerais'}</h1>
           ${!isNovo ? `
             <span class="badge ${projeto.distHabilitado ? 'badge-success' : 'badge-neutral'}">
               ${projeto.distHabilitado ? 'Módulo DIST Habilitado' : 'Módulo DIST Desabilitado'}
@@ -74,10 +79,17 @@ function renderFormulario(container, projeto) {
         <p class="subtitle">Informações cadastrais essenciais do projeto institucional DSV.</p>
       </div>
 
-      <div style="display: flex; gap: 10px;">
-        <button type="button" class="btn btn-primary" id="btn-salvar-info-gerais">
-          <span class="material-symbols-outlined">save</span> ${isNovo ? 'Gravar Novo Projeto' : 'Gravar Informações'}
-        </button>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        ${!isNovo && podeEditar ? `
+          <button type="button" class="btn btn-secondary" id="btn-novo-proj-header" title="Cadastrar outro projeto">
+            <span class="material-symbols-outlined">add</span> Novo Projeto
+          </button>
+        ` : ''}
+        ${podeEditar ? `
+          <button type="button" class="btn btn-primary" id="btn-salvar-info-gerais">
+            <span class="material-symbols-outlined">save</span> ${isNovo ? 'Gravar Novo Projeto' : 'Gravar Informações'}
+          </button>
+        ` : ''}
       </div>
     </div>
 
@@ -103,14 +115,15 @@ function renderFormulario(container, projeto) {
       <!-- Nome do Projeto -->
       <div class="form-group" style="margin-bottom: 0;">
         <label class="form-label" for="info-nome">Nome do Projeto <span class="required">*</span></label>
-        <input type="text" id="info-nome" class="form-input" value="${projeto.nome || ''}" required placeholder="Ex: Modernização do Sistema de Fiscalização">
+        <input type="text" id="info-nome" class="form-input" value="${projeto.nome || ''}" required placeholder="Ex: Modernização do Sistema de Fiscalização" ${!podeEditar ? 'disabled' : ''}>
+        <span class="form-error-msg" id="err-info-nome" style="display: none;"></span>
         <span class="form-hint">Deve identificar o projeto no menu, no cabeçalho e no Dashboard. É sincronizado com a Visão Geral.</span>
       </div>
 
       <!-- Área Gestora -->
       <div class="form-group" style="margin-bottom: 0;">
         <label class="form-label" for="info-area-gestora">Área Gestora (Detran/DSV) <span class="required">*</span></label>
-        <select id="info-area-gestora" class="form-select" required>
+        <select id="info-area-gestora" class="form-select" required ${!podeEditar ? 'disabled' : ''}>
           ${areasDisponiveis.map(area => `
             <option value="${area}" ${area === (projeto.areaGestora || 'DIST - Divisão de Integração Setorial') ? 'selected' : ''}>${area}</option>
           `).join('')}
@@ -121,7 +134,8 @@ function renderFormulario(container, projeto) {
       <!-- Descrição -->
       <div class="form-group" style="margin-bottom: 0;">
         <label class="form-label" for="info-descricao">Descrição do Projeto <span class="required">*</span></label>
-        <textarea id="info-descricao" class="form-textarea" rows="4" required placeholder="Apresente resumidamente a proposta, justificativa e o contexto institucional deste projeto...">${projeto.descricao || ''}</textarea>
+        <textarea id="info-descricao" class="form-textarea" rows="4" required placeholder="Apresente resumidamente a proposta, justificativa e o contexto institucional deste projeto..." ${!podeEditar ? 'disabled' : ''}>${projeto.descricao || ''}</textarea>
+        <span class="form-error-msg" id="err-info-descricao" style="display: none;"></span>
         <span class="form-hint">Texto descritivo consolidado com a síntese das ações institucionais.</span>
       </div>
 
@@ -130,7 +144,7 @@ function renderFormulario(container, projeto) {
         <label class="custom-checkbox-label">
           <input type="checkbox" id="info-dist-habilitado" class="custom-checkbox" 
             ${projeto.distHabilitado !== false ? 'checked' : ''} 
-            ${!podeConfigurarDist ? 'disabled' : ''}>
+            ${!podeConfigurarDist || !podeEditar ? 'disabled' : ''}>
           <span style="font-weight: var(--font-weight-bold); font-size: 13.5px; color: var(--text-main);">
             Utilizar módulo de acompanhamento DIST
           </span>
@@ -154,57 +168,103 @@ function renderFormulario(container, projeto) {
     </form>
   `;
 
+  attachProjectContextCardEvents(container);
+
   const form = container.querySelector('#form-info-gerais');
   const btnSalvar = container.querySelector('#btn-salvar-info-gerais');
+  const btnNovoHeader = container.querySelector('#btn-novo-proj-header');
 
-  // Monitora alterações para ativar o Dirty Guard
+  if (btnNovoHeader) {
+    btnNovoHeader.addEventListener('click', () => {
+      renderFormulario(container, {
+        nome: '',
+        areaGestora: areasDisponiveis[0] || 'DSV - Diretoria de Segurança Veicular',
+        descricao: '',
+        distHabilitado: true,
+        isNovo: true
+      });
+    });
+  }
+
+  // Monitora alterações para ativar o Dirty Guard e limpar erros
   form.querySelectorAll('input, select, textarea').forEach(el => {
-    el.addEventListener('input', () => setDirty(true));
+    el.addEventListener('input', () => {
+      setDirty(true);
+      el.classList.remove('is-invalid');
+      const errEl = container.querySelector(`#err-${el.id}`);
+      if (errEl) errEl.style.display = 'none';
+    });
     el.addEventListener('change', () => setDirty(true));
   });
 
   // Salvar Informações Gerais
-  btnSalvar.addEventListener('click', async () => {
-    const nome = container.querySelector('#info-nome').value.trim();
-    if (!nome) {
-      showToast('O nome do projeto é obrigatório.', 'warning');
-      container.querySelector('#info-nome').focus();
-      return;
-    }
+  if (btnSalvar) {
+    btnSalvar.addEventListener('click', async () => {
+      const inputNome = container.querySelector('#info-nome');
+      const inputDesc = container.querySelector('#info-descricao');
+      const errNome = container.querySelector('#err-info-nome');
+      const errDesc = container.querySelector('#err-info-descricao');
 
-    const areaGestora = container.querySelector('#info-area-gestora').value;
-    const descricao = container.querySelector('#info-descricao').value.trim();
-    const distCheckbox = container.querySelector('#info-dist-habilitado');
-    const distHabilitado = distCheckbox ? distCheckbox.checked : true;
+      let hasError = false;
 
-    try {
-      btnSalvar.disabled = true;
-      btnSalvar.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span> Gravando...`;
-
-      const { currentUser } = getState();
-      const payload = {
-        ...projeto,
-        nome,
-        areaGestora,
-        descricao,
-        distHabilitado
-      };
-
-      if (isNovo) {
-        delete payload.isNovo;
+      const nome = inputNome.value.trim();
+      if (!nome) {
+        inputNome.classList.add('is-invalid');
+        if (errNome) {
+          errNome.textContent = 'O nome do projeto é obrigatório.';
+          errNome.style.display = 'block';
+        }
+        hasError = true;
       }
 
-      const salvo = await ProjetosService.salvarProjeto(payload, currentUser);
+      const descricao = inputDesc.value.trim();
+      if (!descricao) {
+        inputDesc.classList.add('is-invalid');
+        if (errDesc) {
+          errDesc.textContent = 'A descrição do projeto é obrigatória.';
+          errDesc.style.display = 'block';
+        }
+        hasError = true;
+      }
 
-      setActiveProject(salvo);
-      setDirty(false);
-      showToast('Informações gerais do projeto gravadas com sucesso!', 'success');
-      renderInfoGerais(container);
-    } catch (err) {
-      showToast(`Erro ao gravar: ${err.message}`, 'danger');
-    } finally {
-      btnSalvar.disabled = false;
-      btnSalvar.innerHTML = `<span class="material-symbols-outlined">save</span> ${isNovo ? 'Gravar Novo Projeto' : 'Gravar Informações'}`;
-    }
-  });
+      if (hasError) {
+        showToast('Preencha os campos obrigatórios destacados.', 'warning');
+        return;
+      }
+
+      const areaGestora = container.querySelector('#info-area-gestora').value;
+      const distCheckbox = container.querySelector('#info-dist-habilitado');
+      const distHabilitado = distCheckbox ? distCheckbox.checked : true;
+
+      try {
+        btnSalvar.disabled = true;
+        btnSalvar.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span> Gravando...`;
+
+        const { currentUser } = getState();
+        const payload = {
+          ...projeto,
+          nome,
+          areaGestora,
+          descricao,
+          distHabilitado
+        };
+
+        if (isNovo) {
+          delete payload.isNovo;
+        }
+
+        const salvo = await ProjetosService.salvarProjeto(payload, currentUser);
+
+        setActiveProject(salvo);
+        setDirty(false);
+        showToast('Informações gerais do projeto gravadas com sucesso!', 'success');
+        renderInfoGerais(container);
+      } catch (err) {
+        showToast(`Erro ao gravar: ${err.message}`, 'danger');
+      } finally {
+        btnSalvar.disabled = false;
+        btnSalvar.innerHTML = `<span class="material-symbols-outlined">save</span> ${isNovo ? 'Gravar Novo Projeto' : 'Gravar Informações'}`;
+      }
+    });
+  }
 }

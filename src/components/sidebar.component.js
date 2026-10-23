@@ -1,19 +1,33 @@
 /**
  * Componente da Barra Lateral (Sidebar)
  * Seguindo fielmente o Design System DSV
+ * Inclui Seletor de Projeto Ativo integrado e perfil de usuário
  */
-import { getState, setActiveTab, toggleSidebar, subscribe } from '../store/state.js';
+import { getState, setActiveTab, setActiveProject, toggleSidebar, subscribe } from '../store/state.js';
+import { ProjetosService } from '../services/projetos.service.js';
+import { AuthService } from '../services/auth.service.js';
 import { guardedNavigate } from './dirty-guard.js';
 import logoHorizontal from '../../data/refs/logo_horizontal.png';
 import logoDetran from '../../data/refs/logo_detran.png';
+
+function getInitials(name) {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export function renderSidebar() {
   const container = document.getElementById('sidebar-container');
   if (!container) return;
 
-  const update = () => {
-    const { activeTab, activeProject, sidebarCollapsed } = getState();
+  const update = async () => {
+    const { activeTab, activeProject, activeProjectId, sidebarCollapsed, currentUser } = getState();
     const distAtivo = activeProject ? !!activeProject.distHabilitado : null;
+    const initials = currentUser ? getInitials(currentUser.nome) : '';
+    const projetos = await ProjetosService.listarProjetos();
+
+    const nomeProjetoAtivo = activeProject ? (activeProject.nome || activeProject.nome_projeto || 'Projeto Ativo') : 'Nenhum Selecionado';
 
     container.innerHTML = `
       <div class="sidebar-header">
@@ -26,6 +40,24 @@ export function renderSidebar() {
         <button type="button" class="btn-toggle-sidebar" id="btn-toggle-sidebar" aria-label="${sidebarCollapsed ? 'Expandir menu lateral' : 'Colapsar menu lateral'}">
           <span class="material-symbols-outlined">${sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
         </button>
+      </div>
+
+      <!-- Seletor de Projeto Ativo Integrado na Sidebar -->
+      <div class="sidebar-project-widget" title="${sidebarCollapsed ? 'Projeto: ' + nomeProjetoAtivo : ''}">
+        <div class="sidebar-project-widget-label">
+          <span class="material-symbols-outlined">folder_open</span>
+          <span>Projeto Ativo</span>
+        </div>
+        <div class="sidebar-project-select-container">
+          <select id="sidebar-select-project" class="sidebar-project-select" aria-label="Selecione o projeto ativo" title="${nomeProjetoAtivo}">
+            <option value="">-- Selecionar Projeto --</option>
+            ${projetos.map(p => `
+              <option value="${p.id}" ${p.id === activeProjectId ? 'selected' : ''}>
+                ${p.nome || p.nome_projeto || 'Projeto sem nome'} ${p.distHabilitado ? '★' : ''}
+              </option>
+            `).join('')}
+          </select>
+        </div>
       </div>
 
       <ul class="sidebar-nav" role="tablist">
@@ -91,12 +123,28 @@ export function renderSidebar() {
           <span class="dist-indicator-dot"></span>
           <span>${distAtivo === true ? 'DIST Habilitado' : (activeProject ? 'DIST Não Habilitado' : 'Sem Projeto Ativo')}</span>
         </div>
+
+        ${currentUser ? `
+          <div id="userProfileSidebar" class="user-profile-sidebar" title="${currentUser.nome} (${(currentUser.perfil || '').toUpperCase()})">
+            <div class="user-profile-info">
+              <div class="user-avatar" title="${currentUser.nome}">
+                ${initials}
+              </div>
+              <div class="user-name-text">
+                ${currentUser.nome}
+              </div>
+            </div>
+            <button type="button" id="sidebarLogoutBtn" class="btn-sidebar-logout" title="Sair da Conta" aria-label="Sair da Conta">
+              <span class="material-symbols-outlined">logout</span>
+            </button>
+          </div>
+        ` : ''}
       </div>
     `;
 
     // Listeners
     container.querySelectorAll('.nav-tab-link').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', () => {
         const targetTab = btn.getAttribute('data-tab');
         guardedNavigate(() => {
           setActiveTab(targetTab);
@@ -118,12 +166,37 @@ export function renderSidebar() {
         guardedNavigate(() => setActiveTab('dashboard'));
       });
     }
+
+    const projectSelect = container.querySelector('#sidebar-select-project');
+    if (projectSelect) {
+      projectSelect.addEventListener('change', (e) => {
+        const selectedId = e.target.value;
+        guardedNavigate(async () => {
+          if (!selectedId) {
+            setActiveProject(null);
+          } else {
+            const proj = await ProjetosService.obterPorId(selectedId);
+            setActiveProject(proj);
+          }
+        });
+      });
+    }
+
+    const logoutBtn = container.querySelector('#sidebarLogoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        guardedNavigate(async () => {
+          await AuthService.logout();
+        });
+      });
+    }
   };
 
   update();
 
   subscribe('tabChange', update);
   subscribe('projectChange', update);
+  subscribe('userChange', update);
   subscribe('sidebarChange', () => {
     const { sidebarCollapsed } = getState();
     const app = document.getElementById('app');

@@ -1,15 +1,19 @@
 /**
  * View: Gestão de Projetos Interinstitucionais
- * Tabela, busca, filtros, modal de detalhes e formulário de cadastro/edição
+ * Tabela, busca, filtros, modal de detalhes, exclusão para Admin e formulário de cadastro/edição
  */
-import { ProjetosService } from '../services/projetos.service.js';
-import { getState, setActiveProject, setActiveTab, canConfigureDist, canEdit } from '../store/state.js';
+import { ProjetosService, formatarDataOuPeriodo } from '../services/projetos.service.js';
+import { getState, setActiveProject, setActiveTab, canConfigureDist, canEdit, isAdmin } from '../store/state.js';
 import { openModal, closeModal } from '../components/modal.component.js';
 import { showToast } from '../components/toast.component.js';
 import { getAreasInstitucionais } from '../config/areas-institucionais.js';
 import { guardedNavigate } from '../components/dirty-guard.js';
+import { renderMultiselectDropdown } from '../components/multiselect-dropdown.component.js';
 
 export async function renderProjetos(container) {
+  const podeEditar = canEdit();
+  const administrador = isAdmin();
+
   container.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
       <div>
@@ -18,9 +22,11 @@ export async function renderProjetos(container) {
       </div>
 
       <div style="display: flex; gap: 10px;">
-        <button type="button" class="btn btn-primary" id="btn-abrir-novo-projeto">
-          <span class="material-symbols-outlined">add</span> Novo Projeto
-        </button>
+        ${podeEditar ? `
+          <button type="button" class="btn btn-primary" id="btn-abrir-novo-projeto">
+            <span class="material-symbols-outlined">add</span> Novo Projeto
+          </button>
+        ` : ''}
       </div>
     </div>
 
@@ -43,16 +49,16 @@ export async function renderProjetos(container) {
     </div>
 
     <!-- Tabela de Projetos -->
-    <div class="table-responsive">
+    <div class="table-responsive table-responsive-projetos">
       <table class="data-table" id="tabela-projetos">
         <thead>
           <tr>
             <th>Nome do Projeto</th>
             <th>Área Gestora</th>
             <th>Entes Externos</th>
-            <th>Módulo DIST</th>
-            <th>Período</th>
-            <th style="text-align: right;">Ações</th>
+            <th style="text-align: center;">Módulo DIST</th>
+            <th>Vigência / Cronograma</th>
+            <th style="text-align: center;">Ações</th>
           </tr>
         </thead>
         <tbody id="tbody-projetos">
@@ -77,46 +83,77 @@ export async function renderProjetos(container) {
       const isAtivo = p.id === activeProjectId;
       const entesTexto = Array.isArray(p.entesExternos) ? p.entesExternos.join(', ') : (p.entesExternos || 'Nenhum');
 
+      const inicioObj = formatarDataOuPeriodo(p.dataInicio);
+      const fimObj = formatarDataOuPeriodo(p.previsaoEncerramento);
+
+      const inicioHtml = `${inicioObj.texto}${inicioObj.isPrevisao && inicioObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size:9px; padding: 1px 4px;">Previsão</span>' : ''}`;
+      const fimHtml = `${fimObj.texto}${fimObj.isPrevisao && fimObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size:9px; padding: 1px 4px;">Previsão</span>' : ''}`;
+
+      // Limita a exibição da descrição abaixo do nome para no máximo 55 caracteres, evitando poluição visual e estouro de layout
+      const descCompleta = p.descricao || p.objetivo || 'Sem descrição informada';
+      const descCurta = descCompleta.length > 55 ? `${descCompleta.substring(0, 55).trim()}...` : descCompleta;
+
       return `
-        <tr class="${isAtivo ? 'row-active' : ''}">
+        <tr class="${isAtivo ? 'row-active' : ''}" data-row-id="${p.id}" style="cursor: pointer;" title="Clique na linha para expandir detalhes">
           <td>
-            <div style="font-weight: var(--font-weight-bold); color: var(--text-main); font-size: 13.5px;">
-              ${p.nome}
-              ${isAtivo ? '<span class="badge badge-primary" style="margin-left: 6px; font-size: 10px;">Ativo</span>' : ''}
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+              <span style="font-weight: var(--font-weight-bold); color: var(--text-main); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;" title="${p.nome}">
+                ${p.nome}
+              </span>
+              ${isAtivo ? '<span class="badge badge-primary" style="font-size: 10px; flex-shrink: 0;">Ativo</span>' : ''}
             </div>
-            <div style="font-size: 11.5px; color: var(--text-muted); max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${p.objetivo || 'Sem objetivo informado'}
+            <div style="font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;" title="${descCompleta}">
+              ${descCurta}
             </div>
           </td>
-          <td><span class="tag">${p.areaGestora || 'DSV'}</span></td>
-          <td style="max-width: 160px; font-size: 12px; color: var(--text-secondary);">${entesTexto}</td>
-          <td>
+          <td><span class="tag" title="${p.areaGestora || 'DSV'}">${p.areaGestora || 'DSV'}</span></td>
+          <td style="font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${entesTexto}">${entesTexto}</td>
+          <td style="text-align: center;">
             <span class="badge ${p.distHabilitado ? 'badge-success' : 'badge-neutral'}">
               ${p.distHabilitado ? 'Habilitado' : 'Desabilitado'}
             </span>
           </td>
-          <td style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">
-            ${p.dataInicio ? new Date(p.dataInicio).toLocaleDateString('pt-BR') : '—'} até 
-            ${p.previsaoEncerramento ? new Date(p.previsaoEncerramento).toLocaleDateString('pt-BR') : '—'}
+          <td style="font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${inicioHtml} <span style="color: var(--text-muted);">até</span> ${fimHtml}
           </td>
-          <td style="text-align: right; white-space: nowrap;">
-            <button type="button" class="btn btn-secondary btn-sm btn-detalhes-projeto" data-id="${p.id}" title="Expandir detalhes completos">
-              <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
-            </button>
-            <button type="button" class="btn ${isAtivo ? 'btn-primary' : 'btn-outline'} btn-sm btn-selecionar-projeto" data-id="${p.id}" title="Tornar este projeto ativo na navegação">
-              <span>${isAtivo ? 'Selecionado' : 'Selecionar'}</span>
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm btn-editar-projeto" data-id="${p.id}" title="Editar projeto">
-              <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
-            </button>
+          <td style="text-align: center; white-space: nowrap;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+              <button type="button" class="btn btn-secondary btn-sm btn-detalhes-projeto" data-id="${p.id}" title="Expandir detalhes completos">
+                <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span>
+              </button>
+              ${podeEditar ? `
+                <button type="button" class="btn btn-secondary btn-sm btn-editar-projeto" data-id="${p.id}" title="Editar projeto">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
+                </button>
+              ` : ''}
+              ${administrador ? `
+                <button type="button" class="btn btn-secondary btn-sm btn-excluir-projeto" data-id="${p.id}" title="Excluir projeto do sistema" style="color: var(--color-danger);">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+                </button>
+              ` : ''}
+              <button type="button" class="btn ${isAtivo ? 'btn-primary' : 'btn-outline'} btn-sm btn-selecionar-projeto" data-id="${p.id}" title="Tornar este projeto ativo na navegação">
+                <span>${isAtivo ? 'Selecionado' : 'Selecionar'}</span>
+              </button>
+            </div>
           </td>
         </tr>
       `;
     }).join('');
 
-    // Listener Detalhes (Modal expandindo)
+    // Listener clique na linha da tabela para abrir modal de detalhes
+    tbody.querySelectorAll('tr[data-row-id]').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const id = row.getAttribute('data-row-id');
+        const proj = todosProjetos.find(p => p.id === id);
+        if (proj) abrirModalDetalhes(proj);
+      });
+    });
+
+    // Listener Detalhes
     tbody.querySelectorAll('.btn-detalhes-projeto').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = btn.getAttribute('data-id');
         const proj = todosProjetos.find(p => p.id === id);
         if (proj) abrirModalDetalhes(proj);
@@ -125,7 +162,8 @@ export async function renderProjetos(container) {
 
     // Listener Selecionar
     tbody.querySelectorAll('.btn-selecionar-projeto').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = btn.getAttribute('data-id');
         const proj = todosProjetos.find(p => p.id === id);
         if (proj) {
@@ -140,10 +178,38 @@ export async function renderProjetos(container) {
 
     // Listener Editar
     tbody.querySelectorAll('.btn-editar-projeto').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = btn.getAttribute('data-id');
         const proj = todosProjetos.find(p => p.id === id);
         if (proj) abrirModalFormulario(proj);
+      });
+    });
+
+    // Listener Excluir (Administrador)
+    tbody.querySelectorAll('.btn-excluir-projeto').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const proj = todosProjetos.find(p => p.id === id);
+        if (!proj) return;
+
+        if (confirm(`Atenção: Deseja realmente remover o projeto "${proj.nome}"? Esta operação é restrita ao perfil Administrador.`)) {
+          try {
+            const { currentUser, activeProjectId } = getState();
+            await ProjetosService.excluirProjeto(id, currentUser);
+            showToast(`Projeto "${proj.nome}" excluído com sucesso.`, 'info');
+
+            if (activeProjectId === id) {
+              setActiveProject(null);
+            }
+
+            todosProjetos = await ProjetosService.listarProjetos();
+            renderTabela(filtrarProjetos());
+          } catch (err) {
+            showToast(`Erro ao excluir: ${err.message}`, 'danger');
+          }
+        }
       });
     });
   };
@@ -155,6 +221,7 @@ export async function renderProjetos(container) {
     return todosProjetos.filter(p => {
       const matchTermo = !termo || 
         p.nome?.toLowerCase().includes(termo) ||
+        p.descricao?.toLowerCase().includes(termo) ||
         p.objetivo?.toLowerCase().includes(termo) ||
         (Array.isArray(p.entesExternos) && p.entesExternos.some(e => e.toLowerCase().includes(termo)));
 
@@ -175,7 +242,7 @@ export async function renderProjetos(container) {
     renderTabela(filtrarProjetos());
   });
 
-  // Modal de Detalhes Expandidos (Requisito: nome, área gestora, entes externos e áreas envolvidas)
+  // Modal de Detalhes Expandidos
   const abrirModalDetalhes = (proj) => {
     const areas = Array.isArray(proj.areasDetranEnvolvidas) && proj.areasDetranEnvolvidas.length > 0
       ? proj.areasDetranEnvolvidas.map(a => `<span class="tag" style="margin-right: 4px; margin-bottom: 4px;">${a}</span>`).join('')
@@ -185,15 +252,24 @@ export async function renderProjetos(container) {
       ? proj.entesExternos.map(e => `<span class="tag" style="margin-right: 4px; margin-bottom: 4px;">${e}</span>`).join('')
       : '<span style="color: var(--text-muted);">Nenhum ente informado</span>';
 
+    const inicioObj = formatarDataOuPeriodo(proj.dataInicio);
+    const fimObj = formatarDataOuPeriodo(proj.previsaoEncerramento);
+
+    const inicioHtml = `${inicioObj.texto}${inicioObj.isPrevisao && inicioObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; margin-left: 4px;">Previsão</span>' : ''}`;
+    const fimHtml = `${fimObj.texto}${fimObj.isPrevisao && fimObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; margin-left: 4px;">Previsão</span>' : ''}`;
+
     const content = `
       <div style="display: flex; flex-direction: column; gap: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color-light); padding-bottom: 12px;">
-          <div>
-            <span class="badge ${proj.distHabilitado ? 'badge-success' : 'badge-neutral'}">
-              ${proj.distHabilitado ? 'Módulo DIST Habilitado' : 'Módulo DIST Desabilitado'}
-            </span>
-          </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color-light); padding-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <span class="badge ${proj.distHabilitado ? 'badge-success' : 'badge-neutral'}">
+            ${proj.distHabilitado ? 'Módulo DIST Habilitado' : 'Módulo DIST Desabilitado'}
+          </span>
           <span style="font-size: 12px; color: var(--text-muted);">Área Gestora: <strong>${proj.areaGestora || 'DSV'}</strong></span>
+        </div>
+
+        <div>
+          <h4 style="font-size: 12px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Descrição</h4>
+          <p style="font-size: 13.5px; line-height: 1.5; color: var(--text-main);">${proj.descricao || 'Não informada'}</p>
         </div>
 
         <div>
@@ -218,8 +294,8 @@ export async function renderProjetos(container) {
         </div>
 
         <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border-color-light); padding-top: 12px;">
-          <span>Início: <strong>${proj.dataInicio || '—'}</strong></span>
-          <span>Previsão de Fim: <strong>${proj.previsaoEncerramento || '—'}</strong></span>
+          <span>Início: <strong>${inicioHtml}</strong></span>
+          <span>Previsão de Fim: <strong>${fimHtml}</strong></span>
         </div>
       </div>
     `;
@@ -269,6 +345,11 @@ export async function renderProjetos(container) {
           <input type="text" id="form-nome" class="form-input" value="${projetoExistente?.nome || ''}" required placeholder="Ex: Modernização do Sistema X">
         </div>
 
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="form-descricao">Descrição Resumida</label>
+          <textarea id="form-descricao" class="form-textarea" rows="2" placeholder="Síntese da proposta institucional e contexto...">${projetoExistente?.descricao || ''}</textarea>
+        </div>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="form-area-gestora">Área Gestora <span class="required">*</span></label>
@@ -280,15 +361,15 @@ export async function renderProjetos(container) {
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="form-data-inicio">Data de Início</label>
-            <input type="date" id="form-data-inicio" class="form-input" value="${projetoExistente?.dataInicio || ''}">
+            <label class="form-label" for="form-data-inicio">Data / Período de Início</label>
+            <input type="text" id="form-data-inicio" class="form-input" value="${projetoExistente?.dataInicio || ''}" placeholder="Ex: 2026-02-01 ou 1º sem/2026">
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" for="form-previsao-fim">Previsão de Encerramento</label>
-            <input type="date" id="form-previsao-fim" class="form-input" value="${projetoExistente?.previsaoEncerramento || ''}">
+            <input type="text" id="form-previsao-fim" class="form-input" value="${projetoExistente?.previsaoEncerramento || ''}" placeholder="Ex: 2026-12-15 ou Dez/2026">
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
@@ -299,18 +380,9 @@ export async function renderProjetos(container) {
         </div>
 
         <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label">Áreas Detran Envolvidas (Lista Institucional)</label>
-          <div class="chips-container" id="form-chips-areas">
-            ${areasDisponiveis.map(area => {
-              const checked = selectedAreas.includes(area);
-              return `
-                <button type="button" class="chip-selectable ${checked ? 'selected' : ''}" data-area="${area}">
-                  <span class="material-symbols-outlined" style="font-size: 14px;">${checked ? 'check' : 'add'}</span>
-                  <span>${area}</span>
-                </button>
-              `;
-            }).join('')}
-          </div>
+          <label class="form-label">Áreas Detran Envolvidas</label>
+          <div id="form-modal-multiselect-areas"></div>
+          <span class="form-hint">Selecione uma ou mais diretorias ou divisões institucionais do Detran.SP.</span>
         </div>
 
         <div class="form-group" style="margin-bottom: 0;">
@@ -353,14 +425,17 @@ export async function renderProjetos(container) {
       maxWidth: '680px'
     });
 
-    // Chips selection
-    modal.querySelectorAll('#form-chips-areas .chip-selectable').forEach(chip => {
-      chip.addEventListener('click', () => {
-        chip.classList.toggle('selected');
-        const icon = chip.querySelector('.material-symbols-outlined');
-        icon.textContent = chip.classList.contains('selected') ? 'check' : 'add';
-      });
-    });
+    // Dropdown Multiselect de Áreas Detran Envolvidas
+    const multiselectAreas = renderMultiselectDropdown(
+      modal.querySelector('#form-modal-multiselect-areas'),
+      {
+        id: 'modal-areas-multiselect',
+        options: areasDisponiveis,
+        selectedValues: selectedAreas,
+        placeholder: 'Selecione as áreas Detran envolvidas...',
+        searchPlaceholder: 'Buscar diretoria ou divisão...'
+      }
+    );
 
     modal.querySelector('#btn-cancelar-form').addEventListener('click', closeModal);
 
@@ -372,21 +447,27 @@ export async function renderProjetos(container) {
       }
 
       const areaGestora = modal.querySelector('#form-area-gestora').value;
-      const dataInicio = modal.querySelector('#form-data-inicio').value;
-      const previsaoEncerramento = modal.querySelector('#form-previsao-fim').value;
+      const descricao = modal.querySelector('#form-descricao').value.trim();
+      const dataInicio = modal.querySelector('#form-data-inicio').value.trim();
+      const previsaoEncerramento = modal.querySelector('#form-previsao-fim').value.trim();
+
+      try {
+        ProjetosService.validarDatas(dataInicio, previsaoEncerramento);
+      } catch (errData) {
+        showToast(errData.message, 'warning');
+        return;
+      }
+
       const entesRaw = modal.querySelector('#form-entes-externos').value;
       const entesExternos = entesRaw ? entesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-      const areasDetranEnvolvidas = [];
-      modal.querySelectorAll('#form-chips-areas .chip-selectable.selected').forEach(c => {
-        areasDetranEnvolvidas.push(c.getAttribute('data-area'));
-      });
+      const areasDetranEnvolvidas = multiselectAreas ? multiselectAreas.getSelected() : [];
 
       const objetivo = modal.querySelector('#form-objetivo').value.trim();
       const escopo = modal.querySelector('#form-escopo').value.trim();
       
       const distCheckbox = modal.querySelector('#form-dist-habilitado');
-      const distHabilitado = distCheckbox.checked;
+      const distHabilitado = distCheckbox ? distCheckbox.checked : true;
 
       const { currentUser } = getState();
 
@@ -394,6 +475,7 @@ export async function renderProjetos(container) {
         const payload = {
           ...(projetoExistente || {}),
           nome,
+          descricao,
           areaGestora,
           dataInicio,
           previsaoEncerramento,
@@ -423,7 +505,7 @@ export async function renderProjetos(container) {
   };
 
   // Botão Abrir Novo Projeto
-  container.querySelector('#btn-abrir-novo-projeto').addEventListener('click', () => {
+  container.querySelector('#btn-abrir-novo-projeto')?.addEventListener('click', () => {
     abrirModalFormulario(null);
   });
 

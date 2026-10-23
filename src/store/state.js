@@ -1,6 +1,7 @@
 /**
  * Gerenciador de Estado Global Reativo da SPA
  */
+import { isMockFirebase } from '../config/firebase.config.js';
 
 const state = {
   activeTab: 'dashboard',
@@ -8,12 +9,12 @@ const state = {
   activeProject: null,
   isDirty: false,
   sidebarCollapsed: false,
-  currentUser: {
+  currentUser: isMockFirebase ? {
     uid: 'usr_01_dist_gestor',
     nome: 'Carlos Silva (DIST)',
     email: 'carlos.silva@detran.sp.gov.br',
-    perfil: 'gestor_dist' // 'admin' | 'gestor_dist' | 'editor' | 'leitor'
-  }
+    perfil: 'admin'
+  } : null
 };
 
 const listeners = new Map();
@@ -100,11 +101,11 @@ export function toggleSidebar() {
 }
 
 /**
- * Alterna o usuário atual (simulação de perfis)
- * @param {Object} user 
+ * Define o usuário atual
+ * @param {Object|null} user 
  */
 export function setCurrentUser(user) {
-  state.currentUser = { ...user };
+  state.currentUser = user ? { ...user } : null;
   notify('userChange', state.currentUser);
 }
 
@@ -122,5 +123,16 @@ export function canConfigureDist() {
  * @returns {boolean}
  */
 export function canEdit() {
-  return state.currentUser?.perfil !== 'leitor';
+  return !!state.currentUser && 
+         state.currentUser.perfil !== 'leitor' && 
+         state.currentUser.perfil !== 'sem_acesso';
 }
+
+/**
+ * Checa se o usuário atual é administrador
+ * @returns {boolean}
+ */
+export function isAdmin() {
+  return state.currentUser?.perfil === 'admin';
+}
+

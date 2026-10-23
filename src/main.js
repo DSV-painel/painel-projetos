@@ -4,8 +4,10 @@
  */
 import { getState, subscribe, setActiveProject, setActiveTab } from './store/state.js';
 import { ProjetosService } from './services/projetos.service.js';
+import { AuthService } from './services/auth.service.js';
 import { renderSidebar } from './components/sidebar.component.js';
 import { renderHeader } from './components/header.component.js';
+import { renderLogin } from './components/login.component.js';
 
 // Views
 import { renderDashboard } from './views/dashboard.view.js';
@@ -30,14 +32,62 @@ async function renderCurrentView() {
   const container = document.getElementById('view-container');
   if (!container) return;
 
-  const { activeTab } = getState();
+  const { activeTab, currentUser } = getState();
+
+  // Se não estiver logado, exibe tela de login
+  if (!currentUser) {
+    document.getElementById('sidebar-container').style.display = 'none';
+    document.getElementById('header-container').style.display = 'none';
+    renderLogin(container, async () => {
+      // Login com sucesso dispara monitorarAutenticacao automaticamente
+    });
+    return;
+  }
+
+  // Se usuário não tiver acesso autorizado
+  if (currentUser.perfil === 'sem_acesso') {
+    document.getElementById('sidebar-container').style.display = 'none';
+    document.getElementById('header-container').style.display = 'block';
+    await renderHeader();
+
+    container.innerHTML = `
+      <div style="min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div class="card" style="max-width: 520px; text-align: center; padding: 36px 28px; border-top: 4px solid var(--color-warning);">
+          <span class="material-symbols-outlined" style="font-size: 52px; color: var(--color-warning); margin-bottom: 14px;">lock_person</span>
+          <h2 style="font-size: 18px; font-weight: var(--font-weight-bold); margin-bottom: 10px; color: var(--text-main);">
+            Acesso Restrito ao Painel de Projetos
+          </h2>
+          <p style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px;">
+            Olá, <strong>${currentUser.nome}</strong>. Sua conta foi autenticada com sucesso, mas você ainda não possui permissão liberada para este módulo (<code>role_projetos</code>).
+          </p>
+          <div style="background: var(--bg-hover-subtle); padding: 14px; border-radius: var(--radius-button); font-size: 12.5px; color: var(--text-muted); margin-bottom: 24px; text-align: left;">
+            <strong>Como liberar acesso:</strong><br>
+            Solicite a um administrador do sistema a inclusão da permissão <code>role_projetos: "editor"</code> (ou <code>"leitor"</code>) no seu usuário.
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-logout-sem-acesso">
+            <span class="material-symbols-outlined">logout</span> Sair da Conta
+          </button>
+        </div>
+      </div>
+    `;
+
+    container.querySelector('#btn-logout-sem-acesso')?.addEventListener('click', async () => {
+      await AuthService.logout();
+    });
+    return;
+  }
+
+  // Usuário autenticado com perfil válido
+  document.getElementById('sidebar-container').style.display = '';
+  document.getElementById('header-container').style.display = '';
+
   const renderFn = viewMap[activeTab] || renderDashboard;
 
   // Feedback de carregamento suave
   container.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: center; min-height: 240px; color: var(--text-muted); gap: 10px;">
       <span class="material-symbols-outlined" style="font-size: 24px; animation: spin 1s infinite linear;">progress_activity</span>
-      <span>Carregando dados...</span>
+      <span>Carregando dados do Firestore...</span>
     </div>
   `;
 
@@ -57,20 +107,7 @@ async function renderCurrentView() {
 }
 
 async function initApp() {
-  // Inicializa componentes estruturais
-  renderSidebar();
-  await renderHeader();
-
-  // Seleciona o primeiro projeto automaticamente se disponível para conveniência
-  const projetos = await ProjetosService.listarProjetos();
-  if (projetos.length > 0 && !getState().activeProject) {
-    setActiveProject(projetos[0]);
-  }
-
-  // Renderiza a view inicial
-  await renderCurrentView();
-
-  // Re-renderiza views ao trocar de aba ou projeto
+  // Configura listeners de re-renderização
   subscribe('tabChange', () => {
     renderCurrentView();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -78,10 +115,23 @@ async function initApp() {
 
   subscribe('projectChange', () => {
     const { activeTab } = getState();
-    // Se estiver em telas dependentes do projeto, re-renderiza
     if (['info-gerais', 'visao-geral', 'diagnostico', 'matriz-riscos', 'dashboard'].includes(activeTab)) {
       renderCurrentView();
     }
+  });
+
+  subscribe('userChange', async () => {
+    const { currentUser } = getState();
+    if (currentUser && currentUser.perfil !== 'sem_acesso') {
+      renderSidebar();
+      await renderHeader();
+
+      const projetos = await ProjetosService.listarProjetos();
+      if (projetos.length > 0 && !getState().activeProject) {
+        setActiveProject(projetos[0]);
+      }
+    }
+    await renderCurrentView();
   });
 
   // Estilo de animação de rotação para loading
@@ -97,6 +147,20 @@ async function initApp() {
     .bg-neutral { background-color: var(--color-neutral) !important; }
   `;
   document.head.appendChild(styleEl);
+
+  // Monitora autenticação real do Firebase
+  AuthService.monitorarAutenticacao(async (user) => {
+    if (user && user.perfil !== 'sem_acesso') {
+      renderSidebar();
+      await renderHeader();
+
+      const projetos = await ProjetosService.listarProjetos();
+      if (projetos.length > 0 && !getState().activeProject) {
+        setActiveProject(projetos[0]);
+      }
+    }
+    await renderCurrentView();
+  });
 }
 
 // Inicia aplicação após o DOM carregar

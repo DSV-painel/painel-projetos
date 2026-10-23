@@ -59,10 +59,12 @@ export const DiagnosticosService = {
     const now = new Date().toISOString();
     const diagnosticoAtual = await this.obterPorProjeto(dadosDiagnostico.projetoId);
 
-    const payload = {
-      ...dadosDiagnostico,
-      id: diagnosticoAtual ? diagnosticoAtual.id : (dadosDiagnostico.id || `diag_${dadosDiagnostico.projetoId}`),
-      atualizadoEm: now,
+    const entradaHistorico = {
+      timestamp: now,
+      classificacao: dadosDiagnostico.classificacao,
+      situacaoAtual: dadosDiagnostico.situacaoAtual || '',
+      recomendacoesProximosPassos: dadosDiagnostico.recomendacoesProximosPassos || '',
+      areasResponsaveisExecucao: dadosDiagnostico.areasResponsaveisExecucao || [],
       atualizadoPor: {
         uid: usuario?.uid || 'anonimo',
         nome: usuario?.nome || 'Usuário',
@@ -70,9 +72,23 @@ export const DiagnosticosService = {
       }
     };
 
+    const historicoAnterior = Array.isArray(diagnosticoAtual?.historicoEvolucao)
+      ? diagnosticoAtual.historicoEvolucao
+      : [];
+
+    const payload = {
+      ...dadosDiagnostico,
+      id: diagnosticoAtual ? diagnosticoAtual.id : (dadosDiagnostico.id || `diag_${dadosDiagnostico.projetoId}`),
+      atualizadoEm: now,
+      atualizadoPor: entradaHistorico.atualizadoPor,
+      historicoEvolucao: [entradaHistorico, ...historicoAnterior].slice(0, 20)
+    };
+
     const salvo = await StorageAdapter.save(COLLECTION, payload);
 
     const classLabel = LABELS_CLASSIFICACAO_DIAGNOSTICO[salvo.classificacao] || salvo.classificacao;
+    const resumoSituacao = (salvo.situacaoAtual || '').slice(0, 60);
+    const detalheSituacao = resumoSituacao ? ` | Situação: "${resumoSituacao}..."` : '';
 
     await AuditService.registrarLog({
       usuario,
@@ -80,7 +96,7 @@ export const DiagnosticosService = {
       entidade: 'diagnostico',
       entidadeId: salvo.id,
       projetoId: salvo.projetoId,
-      detalhes: `Diagnóstico DIST atualizado. Classificação: "${classLabel}".`
+      detalhes: `Diagnóstico DIST atualizado. Classificação: "${classLabel}"${detalheSituacao}`
     });
 
     return salvo;

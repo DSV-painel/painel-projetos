@@ -110,6 +110,17 @@ export const RiscosService = {
   },
 
   /**
+   * Atualiza um risco existente (alias para salvarRisco com id injetado)
+   * @param {string} id
+   * @param {Object} dadosRisco
+   * @param {Object} usuario
+   * @returns {Promise<Object>}
+   */
+  async atualizarRisco(id, dadosRisco, usuario) {
+    return await this.salvarRisco({ ...dadosRisco, id }, usuario);
+  },
+
+  /**
    * Exclui um risco por ID
    * @param {string} id 
    * @param {Object} usuario 
