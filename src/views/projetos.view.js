@@ -89,6 +89,10 @@ export async function renderProjetos(container) {
       const inicioHtml = `${inicioObj.texto}${inicioObj.isPrevisao && inicioObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size:9px; padding: 1px 4px;">Previsão</span>' : ''}`;
       const fimHtml = `${fimObj.texto}${fimObj.isPrevisao && fimObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size:9px; padding: 1px 4px;">Previsão</span>' : ''}`;
 
+      // Limita a exibição da descrição abaixo do nome para no máximo 55 caracteres, evitando poluição visual e estouro de layout
+      const descCompleta = p.descricao || p.objetivo || 'Sem descrição informada';
+      const descCurta = descCompleta.length > 55 ? `${descCompleta.substring(0, 55).trim()}...` : descCompleta;
+
       return `
         <tr class="${isAtivo ? 'row-active' : ''}" data-row-id="${p.id}" style="cursor: pointer;" title="Clique na linha para expandir detalhes">
           <td>
@@ -98,8 +102,8 @@ export async function renderProjetos(container) {
               </span>
               ${isAtivo ? '<span class="badge badge-primary" style="font-size: 10px; flex-shrink: 0;">Ativo</span>' : ''}
             </div>
-            <div style="font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${p.descricao || p.objetivo || ''}">
-              ${p.descricao || p.objetivo || 'Sem descrição informada'}
+            <div style="font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;" title="${descCompleta}">
+              ${descCurta}
             </div>
           </td>
           <td><span class="tag" title="${p.areaGestora || 'DSV'}">${p.areaGestora || 'DSV'}</span></td>

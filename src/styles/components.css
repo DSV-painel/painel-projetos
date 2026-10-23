@@ -321,6 +321,13 @@
 /* --------------------------------------------------------------------------
    Tabela de Projetos - Layout Fixo e Calibração de Larguras (Issue #10)
    -------------------------------------------------------------------------- */
+/* Expande a largura máxima do container na tela de projetos para acomodar a tabela confortavelmente sem cortes nem rolagem */
+.main-content:has(#tabela-projetos) .wrap,
+.wrap:has(#tabela-projetos),
+.wrap:has(.table-responsive-projetos) {
+  max-width: 1240px;
+}
+
 #tabela-projetos {
   table-layout: fixed;
   width: 100%;
@@ -333,7 +340,7 @@
 
 #tabela-projetos th:nth-child(1),
 #tabela-projetos td:nth-child(1) {
-  width: 30%;
+  width: 27%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -341,7 +348,7 @@
 
 #tabela-projetos th:nth-child(2),
 #tabela-projetos td:nth-child(2) {
-  width: 14%;
+  width: 12%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -372,7 +379,8 @@
 
 #tabela-projetos th:nth-child(6),
 #tabela-projetos td:nth-child(6) {
-  width: 17%;
+  width: 22%;
+  min-width: 210px;
   text-align: right;
   white-space: nowrap;
 }
@@ -389,11 +397,18 @@
 #tabela-projetos .btn-excluir-projeto {
   padding: 5px 6px;
   min-width: 28px;
+  flex-shrink: 0;
 }
 
 #tabela-projetos .btn-selecionar-projeto {
-  padding: 5px 10px;
+  padding: 5px 12px;
   font-size: 11.5px;
+  min-width: 86px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Elimina rolagem horizontal desnecessária na tabela de projetos em desktop (>= 1024px) */
@@ -401,6 +416,7 @@
   .table-responsive:has(#tabela-projetos),
   .table-responsive-projetos {
     overflow-x: hidden;
+    width: 100%;
   }
 }
 
