@@ -17,11 +17,56 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export function normalizarContato(c) {
   if (!c) return null;
-  const nome = c.nome || c.Nome || 'Sem nome';
-  const email = (c.email || c.email_institucional || c.Email || '').trim().toLowerCase();
-  const cargo = c.cargo || c.Cargo || c.funcao || '';
-  const area = c.area || c.setor || c.Setor || c.entidade || c.orgao || '';
-  const telefone = c.telefone || c.celular || c.Telefone || '';
+  const email = (c.email || c.email_institucional || c.Email || c.mail || '').trim().toLowerCase();
+
+  // 1. Extração ampla de chaves possíveis da base CRM (/contatos)
+  const candidatosNome = [
+    c.nome,
+    c.Nome,
+    c.nome_contato,
+    c.nomeContato,
+    c.nome_completo,
+    c.nomeCompleto,
+    c.contato,
+    c.Contato,
+    c.name,
+    c.responsavel,
+    c.identificacao,
+    c.dados?.nome,
+    c.perfil?.nome
+  ];
+
+  let nome = '';
+  for (const cand of candidatosNome) {
+    if (typeof cand === 'string' && cand.trim().length > 0) {
+      nome = cand.trim();
+      break;
+    }
+  }
+
+  // Se responsavel for objeto com nome
+  if (!nome && c.responsavel && typeof c.responsavel === 'object' && typeof c.responsavel.nome === 'string' && c.responsavel.nome.trim()) {
+    nome = c.responsavel.nome.trim();
+  }
+
+  // 2. Fallback inteligente a partir do prefixo do e-mail institucional
+  if (!nome && email) {
+    const prefix = email.split('@')[0] || '';
+    const partes = prefix.split(/[._-]/).filter(Boolean);
+    if (partes.length > 0) {
+      nome = partes
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(' ');
+    }
+  }
+
+  if (!nome) {
+    nome = 'Contato Institucional';
+  }
+
+  const cargo = c.cargo || c.Cargo || c.funcao || c.papel || '';
+  const area = c.area || c.setor || c.Setor || c.entidade || c.orgao || c.lotacao || '';
+  const telefone = c.telefone || c.celular || c.Telefone || c.ramal || '';
   const projetosIds = Array.isArray(c.projetosIds)
     ? c.projetosIds
     : (c.projetoId ? [c.projetoId] : []);
