@@ -13,6 +13,7 @@ import { openModal, closeModal } from '../components/modal.component.js';
 import { getAreasInstitucionais } from '../config/areas-institucionais.js';
 import { renderProjectContextCard, attachProjectContextCardEvents } from '../components/project-context.component.js';
 import { renderMultiselectDropdown } from '../components/multiselect-dropdown.component.js';
+import { buscarEntidadesFuzzy } from '../utils/fuzzy-match.util.js';
 
 export async function renderVisaoGeral(container) {
   const { activeProject } = getState();
@@ -373,13 +374,13 @@ export async function renderVisaoGeral(container) {
         <div id="mc-fuzzy-alert" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #1e40af;"></div>
 
         ${!isEdicao ? `
-          <!-- Seleção com Pesquisa integrada à Base Central de Contatos (Padrão CRM) -->
+          <!-- Seleção com Pesquisa integrada à Base de contatos -->
           <div style="background: var(--bg-hover-subtle); padding: 12px 14px; border-radius: var(--radius-button); border: 1px solid var(--border-color); margin-bottom: 4px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
               <label class="form-label" style="font-weight: 600; margin-bottom: 0;">
-                Pesquisar na Base Central de Contatos (CRM)
+                Pesquisar na Base de contatos
               </label>
-              <span class="badge badge-neutral" style="font-size: 10px;">${todosContatosCrm.length} contatos globais</span>
+              <span class="badge badge-neutral" style="font-size: 10px;">${todosContatosCrm.length} contatos cadastrados</span>
             </div>
             
             <div style="position: relative;">
@@ -391,18 +392,18 @@ export async function renderVisaoGeral(container) {
                 </button>
               </div>
 
-              <!-- Dropdown Flutuante de Resultados da Busca -->
+              <!-- Dropdown Flutuante de Resultados da Busca de Contatos -->
               <div id="mc-crm-dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--bg-card, #ffffff); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); max-height: 220px; overflow-y: auto; z-index: 1050;"></div>
             </div>
 
-            <!-- Card de Contato Selecionado do CRM (com botão de vínculo direto em 1 clique) -->
+            <!-- Card de Contato Selecionado (com botão de vínculo direto em 1 clique) -->
             <div id="mc-crm-selected-box" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px; margin-top: 8px;">
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <div style="min-width: 0; flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px;">
                     <span class="material-symbols-outlined" style="color: #16a34a; font-size: 17px;">verified</span>
                     <strong id="mc-sel-nome" style="color: #15803d; font-size: 13px;"></strong>
-                    <span class="badge badge-success" style="font-size: 9.5px; padding: 2px 6px;">Base Central</span>
+                    <span class="badge badge-success" style="font-size: 9.5px; padding: 2px 6px;">Base de contatos</span>
                   </div>
                   <div id="mc-sel-detalhes" style="font-size: 11.5px; color: #166534; margin-top: 2px;"></div>
                 </div>
@@ -435,18 +436,21 @@ export async function renderVisaoGeral(container) {
             <input type="text" id="mc-cargo" class="form-input" value="${contatoExistente?.cargo || ''}" placeholder="Ex: Coordenadora">
           </div>
 
+          <!-- Seleção de Área / Entidade com Fuzzy Matching e Padrão Visual Consistente -->
           <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="mc-area">Área / Entidade <span class="required">*</span></label>
-            <input type="text" id="mc-area" list="mc-areas-datalist" class="form-input" required value="${contatoExistente?.area || ''}" placeholder="Digite ou selecione a área/órgão (ex: DIST, CET, DER)">
-            <datalist id="mc-areas-datalist">
-              ${areasInstitucionais.map(a => `<option value="${a}">`).join('')}
-              <option value="CET">
-              <option value="DER">
-              <option value="Polícia Rodoviária">
-              <option value="Prodesp">
-              <option value="Poupatempo">
-              <option value="Secretaria da Fazenda">
-            </datalist>
+            <label class="form-label" for="mc-area" style="font-weight: 600;">Área / Entidade <span class="required">*</span></label>
+            <div style="position: relative;">
+              <div style="display: flex; align-items: center; position: relative;">
+                <span class="material-symbols-outlined" style="position: absolute; left: 10px; font-size: 18px; color: var(--text-muted); pointer-events: none;">domain</span>
+                <input type="text" id="mc-area" class="form-input" required value="${contatoExistente?.area || ''}" placeholder="Pesquise ou digite a entidade (ex: CET, DER, DIST, Prodesp)..." style="padding-left: 36px; padding-right: 32px;" autocomplete="off" />
+                <button type="button" id="mc-area-clear" style="${contatoExistente?.area ? 'display: block;' : 'display: none;'} position: absolute; right: 8px; background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;" title="Limpar área">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
+                </button>
+              </div>
+
+              <!-- Dropdown Flutuante de Seleção com Fuzzy Matching para Entidade -->
+              <div id="mc-area-dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--bg-card, #ffffff); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); max-height: 200px; overflow-y: auto; z-index: 1060;"></div>
+            </div>
             <span class="form-error-msg" id="err-mc-area" style="display: none;"></span>
           </div>
         </div>
@@ -512,6 +516,9 @@ export async function renderVisaoGeral(container) {
       modal.querySelector('#mc-email').value = c.email || '';
       modal.querySelector('#mc-tel').value = c.telefone || '';
 
+      const areaClear = modal.querySelector('#mc-area-clear');
+      if (areaClear) areaClear.style.display = c.area ? 'block' : 'none';
+
       if (selectedBox && selNome && selDetalhes) {
         selNome.textContent = c.nome;
         selDetalhes.textContent = `${c.email} • ${c.cargo ? `${c.cargo} • ` : ''}${c.area || 'Sem área'}`;
@@ -565,7 +572,7 @@ export async function renderVisaoGeral(container) {
         if (filtrados.length === 0) {
           crmDropdown.innerHTML = `
             <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
-              Nenhum contato encontrado no CRM com "<strong>${query}</strong>".<br>
+              Nenhum contato encontrado com "<strong>${query}</strong>".<br>
               <span style="font-size: 11px;">Preencha os campos abaixo para cadastrá-lo como novo.</span>
             </div>
           `;
@@ -622,6 +629,107 @@ export async function renderVisaoGeral(container) {
       });
     }
 
+    // Lista unificada de entidades institucionais e parceiras conhecidas para Fuzzy Matching
+    const listaEntidades = Array.from(new Set([
+      ...areasInstitucionais,
+      'CET - Companhia de Engenharia de Tráfego',
+      'DER - Departamento de Estradas de Rodagem',
+      'PMRv - Polícia Militar Rodoviária',
+      'Prodesp - Cia de Processamento de Dados do Estado de SP',
+      'Poupatempo',
+      'Sefaz - Secretaria da Fazenda e Planejamento',
+      'Semil - Secretaria de Meio Ambiente, Infraestrutura e Logística',
+      'Artesp - Agência de Transporte do Estado de SP',
+      'PRF - Polícia Rodoviária Federal',
+      ...(projeto.entesExternos || []),
+      projeto.areaGestora,
+      ...(projeto.areasDetranEnvolvidas || []),
+      ...todosContatosCrm.map(c => c.area)
+    ].filter(Boolean)));
+
+    // Componente de Seleção com Fuzzy Matching para Área / Entidade
+    const inputArea = modal.querySelector('#mc-area');
+    const areaDropdown = modal.querySelector('#mc-area-dropdown');
+    const areaClearBtn = modal.querySelector('#mc-area-clear');
+
+    const renderAreaDropdown = (termo = '') => {
+      const resultados = buscarEntidadesFuzzy(termo, listaEntidades);
+      const queryTrim = termo.trim();
+
+      if (resultados.length === 0 && !queryTrim) {
+        areaDropdown.style.display = 'none';
+        return;
+      }
+
+      let html = '';
+      if (resultados.length > 0) {
+        html += resultados.slice(0, 7).map(r => `
+          <div class="area-fuzzy-item" data-area-val="${r.entidade}" style="padding: 8px 12px; border-bottom: 1px solid var(--border-color-light); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; transition: background 0.15s ease;">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-primary); flex-shrink: 0;">apartment</span>
+              <span style="color: var(--text-main); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r.entidade}</span>
+            </div>
+            ${r.motivo && r.motivo !== 'Listagem geral' ? `
+              <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; flex-shrink: 0;">${r.motivo}</span>
+            ` : ''}
+          </div>
+        `).join('');
+      }
+
+      if (queryTrim && !listaEntidades.some(e => e.toLowerCase() === queryTrim.toLowerCase())) {
+        html += `
+          <div class="area-fuzzy-item area-fuzzy-custom" data-area-val="${queryTrim}" style="padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-primary); background: var(--bg-hover-subtle); border-top: 1px dashed var(--border-color);">
+            <span class="material-symbols-outlined" style="font-size: 16px;">add_circle</span>
+            <span>Usar "<strong>${queryTrim}</strong>" como nova área/entidade</span>
+          </div>
+        `;
+      }
+
+      areaDropdown.innerHTML = html;
+      areaDropdown.style.display = 'block';
+
+      areaDropdown.querySelectorAll('.area-fuzzy-item').forEach(item => {
+        item.addEventListener('mouseenter', () => item.style.backgroundColor = 'var(--bg-hover, #f1f5f9)');
+        item.addEventListener('mouseleave', () => {
+          if (!item.classList.contains('area-fuzzy-custom')) item.style.backgroundColor = 'transparent';
+        });
+        item.addEventListener('click', () => {
+          const val = item.getAttribute('data-area-val');
+          inputArea.value = val;
+          areaClearBtn.style.display = 'block';
+          areaDropdown.style.display = 'none';
+          inputArea.classList.remove('is-invalid');
+          const errEl = modal.querySelector('#err-mc-area');
+          if (errEl) errEl.style.display = 'none';
+          checarSimilaridade();
+        });
+      });
+    };
+
+    inputArea?.addEventListener('focus', () => renderAreaDropdown(inputArea.value));
+    inputArea?.addEventListener('input', () => {
+      areaClearBtn.style.display = inputArea.value ? 'block' : 'none';
+      renderAreaDropdown(inputArea.value);
+      checarSimilaridade();
+    });
+    areaClearBtn?.addEventListener('click', () => {
+      inputArea.value = '';
+      areaClearBtn.style.display = 'none';
+      renderAreaDropdown('');
+      inputArea.focus();
+      checarSimilaridade();
+    });
+
+    // Fecha dropdowns flutuantes ao clicar fora
+    modal.addEventListener('click', (e) => {
+      if (crmDropdown && !crmSearchInput?.contains(e.target) && !crmDropdown.contains(e.target)) {
+        crmDropdown.style.display = 'none';
+      }
+      if (areaDropdown && !inputArea?.contains(e.target) && !areaDropdown.contains(e.target)) {
+        areaDropdown.style.display = 'none';
+      }
+    });
+
     // Detecção de Contato Similar / Mesma Pessoa via Fuzzy Matching
     let debounceTimer = null;
     const fuzzyAlert = modal.querySelector('#mc-fuzzy-alert');
@@ -655,7 +763,7 @@ export async function renderVisaoGeral(container) {
               <div style="min-width: 0;">
                 <strong style="color: #1e3a8a; display: flex; align-items: center; gap: 4px;">
                   <span class="material-symbols-outlined" style="font-size: 16px;">info</span>
-                  Contato similar identificado na Base Central (CRM):
+                  Contato similar identificado na Base de contatos:
                 </strong>
                 <div style="margin-top: 2px;"><strong>${c.nome}</strong> (${c.email}) - ${c.area || 'Sem área'}</div>
                 <div style="font-size: 11px; color: #3b82f6; margin-top: 2px;">${resultado.motivo}</div>

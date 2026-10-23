@@ -3,7 +3,8 @@ import {
   normalizarTextoParaComparacao, 
   calcularDistanciaLevenshtein, 
   calcularSimilaridadeLevenshtein, 
-  compararNomesFuzzy 
+  compararNomesFuzzy,
+  buscarEntidadesFuzzy
 } from '../src/utils/fuzzy-match.util.js';
 import { ContatosService } from '../src/services/contatos.service.js';
 
@@ -122,5 +123,42 @@ describe('Detecção de Mesma Pessoa e Contato Similar (ContatosService)', () =>
 
     expect(res.similar).toBe(false);
     expect(res.contato).toBeNull();
+  });
+});
+
+describe('Busca e Seleção Fuzzy de Entidades / Órgãos (buscarEntidadesFuzzy)', () => {
+  const entidadesExemplo = [
+    'CET - Companhia de Engenharia de Tráfego',
+    'DER - Depto de Estradas de Rodagem',
+    'DIST - Divisão de Integração Setorial',
+    'DTI - Diretoria de Tecnologia da Informação',
+    'DSV - Diretoria de Segurança Veicular',
+    'Secretaria da Fazenda e Planejamento',
+    'Polícia Militar Rodoviária',
+    'Prodesp'
+  ];
+
+  it('deve localizar entidade pela sigla exata com score máximo', () => {
+    const res = buscarEntidadesFuzzy('CET', entidadesExemplo);
+    expect(res.length).toBeGreaterThan(0);
+    expect(res[0].entidade).toContain('CET');
+    expect(res[0].score).toBe(1.0);
+  });
+
+  it('deve localizar entidade sem acentos e com termos parciais', () => {
+    const res = buscarEntidadesFuzzy('policia rodoviaria', entidadesExemplo);
+    expect(res.length).toBeGreaterThan(0);
+    expect(res[0].entidade).toBe('Polícia Militar Rodoviária');
+  });
+
+  it('deve tolerar variações de grafia e buscar por substring (fazenda)', () => {
+    const res = buscarEntidadesFuzzy('fazenda', entidadesExemplo);
+    expect(res.length).toBeGreaterThan(0);
+    expect(res[0].entidade).toBe('Secretaria da Fazenda e Planejamento');
+  });
+
+  it('deve retornar lista completa quando termo for vazio', () => {
+    const res = buscarEntidadesFuzzy('', entidadesExemplo);
+    expect(res.length).toBe(entidadesExemplo.length);
   });
 });
