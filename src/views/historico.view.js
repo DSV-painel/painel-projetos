@@ -4,6 +4,7 @@
  */
 import { AuditService } from '../services/audit.service.js';
 import { ProjetosService } from '../services/projetos.service.js';
+import { exportarParaCSV } from '../utils/csv-export.util.js';
 
 export async function renderHistorico(container) {
   const projetos = await ProjetosService.listarProjetos();
@@ -17,42 +18,41 @@ export async function renderHistorico(container) {
 
       <div>
         <button type="button" class="btn btn-secondary" id="btn-atualizar-historico">
-          <span class="material-symbols-outlined">refresh</span> Atualizar Log
+          <span class="material-icons">refresh</span> Atualizar Log
         </button>
       </div>
     </div>
 
-    <!-- Barra de Filtros -->
-    <div class="card" style="padding: 14px 18px; margin-bottom: 20px;">
-      <div style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
-        <div style="flex: 1; min-width: 240px; position: relative;">
-          <input type="text" id="filtro-busca-historico" class="form-input" placeholder="Buscar por detalhes, usuário ou ação..." style="padding-left: 36px;">
-          <span class="material-symbols-outlined" style="position: absolute; left: 10px; top: 11px; color: var(--text-muted); font-size: 18px;">search</span>
-        </div>
-
-        <div style="min-width: 170px;">
-          <select id="filtro-projeto-historico" class="form-select">
-            <option value="todos">Todos os Projetos</option>
-            ${projetos.map(p => `
-              <option value="${p.id}">${p.nome}</option>
-            `).join('')}
-          </select>
-        </div>
-
-        <div style="min-width: 160px;">
-          <select id="filtro-entidade-historico" class="form-select">
-            <option value="todas">Todas as Entidades</option>
-            <option value="projeto">Projetos</option>
-            <option value="diagnostico">Diagnósticos</option>
-            <option value="risco">Riscos</option>
-            <option value="contato">Contatos</option>
-          </select>
-        </div>
+    <!-- Barra de Ferramentas / Toolbar (Padrão CRM) -->
+    <div class="toolbar">
+      <div class="search-wrapper">
+        <span class="material-icons">search</span>
+        <input type="text" id="filtro-busca-historico" class="search-input" placeholder="Pesquisar histórico..." autocomplete="off">
       </div>
+
+      <select id="filtro-projeto-historico" class="filter-select">
+        <option value="todos">Todos os Projetos</option>
+        ${projetos.map(p => `
+          <option value="${p.id}">${p.sigla ? '[' + p.sigla + '] ' : ''}${p.nome}</option>
+        `).join('')}
+      </select>
+
+      <select id="filtro-entidade-historico" class="filter-select">
+        <option value="todas">Todas as Entidades</option>
+        <option value="projeto">Projetos</option>
+        <option value="diagnostico">Diagnósticos</option>
+        <option value="risco">Riscos</option>
+        <option value="contato">Contatos</option>
+        <option value="interacao">Interações / Reuniões</option>
+      </select>
+
+      <button id="btn-download-historico" class="icon-btn" title="Baixar Planilha CSV" style="margin-left: auto;">
+        <span class="material-icons">download</span>
+      </button>
     </div>
 
     <!-- Tabela de Histórico -->
-    <div class="table-responsive">
+    <div class="table-container table-responsive">
       <table class="data-table">
         <thead>
           <tr>
@@ -149,6 +149,26 @@ export async function renderHistorico(container) {
 
   container.querySelector('#filtro-projeto-historico').addEventListener('change', () => {
     renderTabela(filtrarLogs());
+  });
+
+  container.querySelector('#btn-download-historico')?.addEventListener('click', () => {
+    const dados = filtrarLogs().map(l => ({
+      dataHora: l.timestamp ? new Date(l.timestamp).toLocaleString('pt-BR') : '',
+      usuario: l.usuario?.nome || '',
+      email: l.usuario?.email || '',
+      acao: l.acao || '',
+      entidade: l.entidade || '',
+      detalhes: l.detalhes || ''
+    }));
+
+    exportarParaCSV(dados, [
+      { key: 'dataHora', label: 'Data & Hora' },
+      { key: 'usuario', label: 'Usuário Responsável' },
+      { key: 'email', label: 'E-mail' },
+      { key: 'acao', label: 'Ação Realizada' },
+      { key: 'entidade', label: 'Entidade / Domínio' },
+      { key: 'detalhes', label: 'Detalhamento da Operação' }
+    ], 'auditoria_historico.csv');
   });
 
   container.querySelector('#btn-atualizar-historico').addEventListener('click', async () => {

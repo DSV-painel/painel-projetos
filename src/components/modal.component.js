@@ -111,3 +111,66 @@ export function closeModal() {
 
   activeModal = null;
 }
+
+/**
+ * Diálogo Institucional de Confirmação Acessível (substitui window.confirm nativo)
+ * @param {Object} opcoes
+ * @returns {Promise<boolean>}
+ */
+export function confirmModal({
+  title = 'Confirmação',
+  message = 'Tem certeza que deseja prosseguir?',
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
+  danger = false
+} = {}) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const footerHtml = `
+      <button type="button" class="btn btn-secondary" id="btn-modal-cancel">${cancelText}</button>
+      <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="btn-modal-confirm">${confirmText}</button>
+    `;
+
+    const content = `
+      <div style="display: flex; gap: 14px; align-items: flex-start; padding: 10px 0;">
+        <span class="material-symbols-outlined" style="font-size: 32px; color: ${danger ? '#b91c1c' : '#0f5cab'}; flex-shrink: 0;">
+          ${danger ? 'warning' : 'help'}
+        </span>
+        <div style="font-size: 14px; color: var(--text-body); line-height: 1.5;">
+          ${message}
+        </div>
+      </div>
+    `;
+
+    const box = openModal({
+      title,
+      content,
+      footerHtml,
+      maxWidth: '480px',
+      onClose: () => {
+        if (!resolved) {
+          resolved = true;
+          resolve(false);
+        }
+      }
+    });
+
+    if (box) {
+      box.querySelector('#btn-modal-cancel')?.addEventListener('click', () => {
+        if (!resolved) {
+          resolved = true;
+          resolve(false);
+        }
+        closeModal();
+      });
+
+      box.querySelector('#btn-modal-confirm')?.addEventListener('click', () => {
+        if (!resolved) {
+          resolved = true;
+          resolve(true);
+        }
+        closeModal();
+      });
+    }
+  });
+}

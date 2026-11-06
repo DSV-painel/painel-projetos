@@ -14,11 +14,14 @@ const COLLECTION = 'projetos';
  */
 export function normalizarProjeto(p) {
   if (!p) return null;
+  const id = p.id || p.id_projeto || '';
   const nome = p.nome || p.nome_projeto || p.titulo || 'Projeto sem nome';
   const descricao = p.descricao || p.descricao_projeto || '';
   const sigla = p.sigla || p.sigla_projeto || '';
   return {
     ...p,
+    id,
+    id_projeto: p.id_projeto || id,
     nome,
     nome_projeto: p.nome_projeto || nome,
     descricao,
@@ -114,13 +117,18 @@ export const ProjetosService = {
     }
 
     const descricao = (dadosProjeto.descricao || dadosProjeto.descricao_projeto || '').trim();
+    const sigla = (dadosProjeto.sigla || dadosProjeto.sigla_projeto || '').trim();
+    const id = dadosProjeto.id || dadosProjeto.id_projeto;
 
     const payload = {
       ...dadosProjeto,
+      ...(id ? { id, id_projeto: id } : {}),
       nome,
       nome_projeto: nome,
       descricao,
       descricao_projeto: descricao,
+      sigla,
+      sigla_projeto: sigla,
       distHabilitado: distHabilitado !== undefined ? !!distHabilitado : true,
       atualizadoEm: now,
       atualizadoPor: {
@@ -136,6 +144,11 @@ export const ProjetosService = {
     }
 
     const salvo = await StorageAdapter.save(COLLECTION, payload);
+    // Garante id_projeto espelhado caso o id tenha sido gerado pelo adapter
+    if (!salvo.id_projeto && salvo.id) {
+      salvo.id_projeto = salvo.id;
+      await StorageAdapter.save(COLLECTION, { id: salvo.id, id_projeto: salvo.id });
+    }
 
     // Registro na trilha de auditoria
     if (isNovo) {

@@ -66,21 +66,25 @@ export const AuthService = {
 
     if (!isMockFirebase && db) {
       try {
-        let userDocSnap = await getDoc(doc(db, 'usuarios', firebaseUser.uid));
+        let userDocSnap = null;
         
         // No painel-crm original, os documentos em /usuarios são indexados pelo e-mail
-        if (!userDocSnap.exists() && firebaseUser.email) {
+        if (firebaseUser.email) {
           const emailKey = firebaseUser.email.toLowerCase().trim();
           userDocSnap = await getDoc(doc(db, 'usuarios', emailKey));
         }
 
-        if (userDocSnap.exists()) {
+        if (!userDocSnap || !userDocSnap.exists()) {
+          userDocSnap = await getDoc(doc(db, 'usuarios', firebaseUser.uid));
+        }
+
+        if (userDocSnap && userDocSnap.exists()) {
           dadosDoc = userDocSnap.data();
 
           // Avaliação de RBAC Granular:
+          const roleGeral = dadosDoc.role || dadosDoc.papel;
           const isAdminGeral = dadosDoc.admin_geral === true || 
-                               dadosDoc.role === 'admin' || 
-                               dadosDoc.papel === 'admin';
+                               roleGeral === 'admin';
 
           const roleProjetos = dadosDoc.role_projetos;
 
@@ -93,9 +97,15 @@ export const AuthService = {
           } else if (roleProjetos === 'sem_acesso') {
             perfil = 'sem_acesso';
           } else {
-            // Se não tem role_projetos explicitado e não é admin geral:
-            // Por segurança, fica bloqueado até o admin liberar
-            perfil = 'sem_acesso';
+            // Fallback transparente: se role_projetos não estiver definido,
+            // mapeia automaticamente a role existente do CRM
+            if (['revisor', 'editor', 'cadastro'].includes(roleGeral)) {
+              perfil = 'editor';
+            } else if (roleGeral === 'leitor') {
+              perfil = 'leitor';
+            } else {
+              perfil = 'sem_acesso';
+            }
           }
         } else {
           // Documento não existe em /usuarios

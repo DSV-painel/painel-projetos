@@ -65,8 +65,9 @@ button, input, select, textarea, optgroup, option {
 /* Estrutura Principal da SPA */
 .app-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
+  overflow: hidden;
 }
 
 .main-wrapper {
@@ -75,6 +76,8 @@ button, input, select, textarea, optgroup, option {
   flex-direction: column;
   min-width: 0;
   margin-left: var(--sidebar-width-expanded);
+  height: 100vh;
+  overflow-y: auto;
   transition: var(--transition-smooth);
 }
 
@@ -82,19 +85,33 @@ button, input, select, textarea, optgroup, option {
   margin-left: var(--sidebar-width-collapsed);
 }
 
-/* Header Superior */
+/* Header Superior (Oculto em Desktop para manter o layout limpo 100vh no exato padrão do painel-crm) */
 .top-header {
-  height: var(--header-height);
-  background-color: var(--bg-card);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 40px;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  box-shadow: var(--shadow-sm);
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app-layout {
+    height: auto;
+    overflow: visible;
+  }
+  .main-wrapper {
+    margin-left: 0 !important;
+    height: auto;
+    overflow: visible;
+  }
+  .top-header {
+    display: flex;
+    height: var(--header-height);
+    background-color: var(--bg-card);
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
 }
 
 /* Conteúdo Principal */

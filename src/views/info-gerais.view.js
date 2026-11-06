@@ -112,12 +112,20 @@ function renderFormulario(container, projeto) {
         <span style="font-size: 11.5px; color: var(--text-muted);">Campos com * são de preenchimento obrigatório</span>
       </div>
 
-      <!-- Nome do Projeto -->
-      <div class="form-group" style="margin-bottom: 0;">
-        <label class="form-label" for="info-nome">Nome do Projeto <span class="required">*</span></label>
-        <input type="text" id="info-nome" class="form-input" value="${projeto.nome || ''}" required placeholder="Ex: Modernização do Sistema de Fiscalização" ${!podeEditar ? 'disabled' : ''}>
-        <span class="form-error-msg" id="err-info-nome" style="display: none;"></span>
-        <span class="form-hint">Deve identificar o projeto no menu, no cabeçalho e no Dashboard. É sincronizado com a Visão Geral.</span>
+      <!-- Nome e Sigla do Projeto -->
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="info-nome">Nome do Projeto <span class="required">*</span></label>
+          <input type="text" id="info-nome" class="form-input" value="${projeto.nome || ''}" required placeholder="Ex: Modernização do Sistema de Fiscalização" ${!podeEditar ? 'disabled' : ''}>
+          <span class="form-error-msg" id="err-info-nome" style="display: none;"></span>
+          <span class="form-hint">Deve identificar o projeto no menu, no cabeçalho e no Dashboard. É sincronizado com a Visão Geral.</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="info-sigla">Sigla / Tag do Projeto</label>
+          <input type="text" id="info-sigla" class="form-input" value="${projeto.sigla || projeto.sigla_projeto || ''}" placeholder="Ex: SFE, CNH, RSV" ${!podeEditar ? 'disabled' : ''}>
+          <span class="form-hint">Sigla que aparece no card e no catálogo do painel-crm.</span>
+        </div>
       </div>
 
       <!-- Área Gestora -->
@@ -240,10 +248,13 @@ function renderFormulario(container, projeto) {
         btnSalvar.disabled = true;
         btnSalvar.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span> Gravando...`;
 
+        const sigla = container.querySelector('#info-sigla')?.value.trim() || '';
         const { currentUser } = getState();
         const payload = {
           ...projeto,
           nome,
+          sigla,
+          sigla_projeto: sigla,
           areaGestora,
           descricao,
           distHabilitado
