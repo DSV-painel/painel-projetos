@@ -113,19 +113,19 @@
   color: var(--text-main);
 }
 
-/* Widget de Seleção de Projeto Integrado na Sidebar */
+/* Widget de Seleção de Projeto Integrado na Sidebar (Superfície Clara DSV) */
 .sidebar-project-widget {
   margin: 0 0 16px 0;
   padding: 10px 12px;
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   transition: all 0.2s ease;
 }
 
 .sidebar-project-widget:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .sidebar-project-widget-label {
@@ -135,14 +135,15 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #94a3b8;
-  font-weight: 600;
+  color: #0f5cab;
+  font-weight: 700;
   margin-bottom: 6px;
 }
 
+.sidebar-project-widget-label .material-icons,
 .sidebar-project-widget-label .material-symbols-outlined {
-  font-size: 15px;
-  color: #60a5fa;
+  font-size: 16px;
+  color: #0f5cab;
 }
 
 .sidebar-project-select-container {
@@ -152,12 +153,12 @@
 
 .sidebar-project-select {
   width: 100%;
-  background-color: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  color: #f8fafc;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #1e293b;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   padding: 6px 8px;
   outline: none;
   cursor: pointer;
@@ -167,8 +168,8 @@
 }
 
 .sidebar-project-select:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 1px #3b82f6;
+  border-color: #0f5cab;
+  box-shadow: 0 0 0 1px #0f5cab;
 }
 
 .app-layout.sidebar-collapsed .sidebar-project-widget {
@@ -179,7 +180,7 @@
   margin: 0 0 12px 0;
 }
 
-.app-layout.sidebar-collapsed .sidebar-project-widget-label span:not(.material-symbols-outlined) {
+.app-layout.sidebar-collapsed .sidebar-project-widget-label span:not(.material-symbols-outlined):not(.material-icons) {
   display: none;
 }
 
@@ -196,40 +197,26 @@
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   list-style: none;
   flex: 1;
-}
-
-.nav-section-title {
-  font-size: 11px;
-  font-weight: var(--font-weight-bold);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  padding: 12px 14px 6px;
-  margin-top: 10px;
-}
-
-.app-layout.sidebar-collapsed .nav-section-title {
-  display: none;
 }
 
 .nav-tab-item {
   width: 100%;
 }
 
-.nav-tab-link {
+.tab, .nav-tab-link {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-radius: var(--radius-card);
-  color: var(--text-secondary);
+  border-radius: 12px;
+  color: var(--text-secondary, #475569);
   text-decoration: none;
-  font-size: var(--font-size-menu);
-  font-weight: var(--font-weight-medium);
-  transition: var(--transition-fast);
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
   cursor: pointer;
   border: none;
   background: transparent;
@@ -238,35 +225,61 @@
   white-space: nowrap;
 }
 
+.tab .material-icons,
+.tab .material-symbols-outlined,
+.nav-tab-link .material-icons,
 .nav-tab-link .material-symbols-outlined {
   font-size: 20px;
   flex-shrink: 0;
   transition: var(--transition-fast);
 }
 
-.nav-tab-link:hover {
-  background-color: var(--bg-hover);
-  color: var(--text-main);
+.tab:hover, .nav-tab-link:hover {
+  background-color: var(--bg-hover, #f1f5f9);
+  color: var(--text-main, #0f172a);
 }
 
-.nav-tab-link.active {
-  background-color: var(--color-primary);
-  color: var(--text-inverse);
-  font-weight: var(--font-weight-bold);
-  box-shadow: var(--shadow-tab-active);
+.tab.active, .nav-tab-link.active {
+  background-color: var(--color-primary, #0f5cab);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 4px rgba(15, 92, 171, 0.2);
 }
 
+.tab.active .material-icons,
+.tab.active .material-symbols-outlined,
+.nav-tab-link.active .material-icons,
 .nav-tab-link.active .material-symbols-outlined {
-  color: var(--text-inverse);
+  color: #ffffff;
 }
 
-.nav-tab-link.disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  pointer-events: auto; /* Permite exibir tooltip ou aviso explicativo */
+.app-layout.sidebar-collapsed .tab,
+.app-layout.sidebar-collapsed .nav-tab-link {
+  justify-content: center;
+  padding: 12px;
+  position: relative;
 }
 
-.app-layout.sidebar-collapsed .nav-tab-label {
+/* Tooltip no modo colapsado */
+.app-layout.sidebar-collapsed .tab[data-tooltip]:hover::after,
+.app-layout.sidebar-collapsed .nav-tab-link[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 70px;
+  background: #1e293b;
+  color: #ffffff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 999;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+  pointer-events: none;
+}
+
+.app-layout.sidebar-collapsed .nav-tab-label,
+.app-layout.sidebar-collapsed .tab-text {
   display: none;
 }
 
@@ -276,17 +289,79 @@
   font-weight: var(--font-weight-bold);
   padding: 2px 7px;
   border-radius: var(--radius-badge);
-  background-color: var(--bg-hover);
-  color: var(--text-secondary);
+  background-color: var(--bg-hover, #e2e8f0);
+  color: var(--text-secondary, #475569);
 }
 
-.nav-tab-link.active .nav-tab-badge {
+.nav-tab-link.active .nav-tab-badge,
+.tab.active .nav-tab-badge {
   background-color: rgba(255, 255, 255, 0.25);
-  color: var(--text-inverse);
+  color: #ffffff;
 }
 
 .app-layout.sidebar-collapsed .nav-tab-badge {
   display: none;
+}
+
+/* Sub-abas Horizontais do Projeto Ativo (Design System DSV) */
+.project-subtabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+  overflow-x: auto;
+}
+
+.project-subtab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.project-subtab-btn:hover:not(.disabled) {
+  background-color: #e2e8f0;
+  color: #0f5cab;
+  border-color: #cbd5e1;
+}
+
+.project-subtab-btn.active {
+  background-color: #0f5cab;
+  color: #ffffff;
+  border-color: #0f5cab;
+  box-shadow: 0 2px 4px rgba(15, 92, 171, 0.2);
+}
+
+.project-subtab-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #f1f5f9;
+}
+
+.project-subtab-btn .material-symbols-outlined,
+.project-subtab-btn .material-icons {
+  font-size: 18px;
+}
+
+.project-subtab-btn .subtab-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #e2e8f0;
+  color: #64748b;
+  margin-left: 4px;
 }
 
 /* Footer da Sidebar com Status do Módulo DIST */

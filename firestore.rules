@@ -1,72 +1,86 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
+    
     // =========================================================================
-    // FUNÇÕES AUXILIARES DE AUTENTICAÇÃO E PERFIS POR PAINEL
+    // FUNÇÕES AUXILIARES DE AUTENTICAÇÃO E PERFIS MULTI-SISTEMAS (RSV & DIST)
     // =========================================================================
 
+    // Verifica se o usuário está autenticado
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    // Busca usuário pelo e-mail (chave primária do painel-crm)
+    function hasUserByEmail() {
+      return isAuthenticated() && request.auth.token.email != null &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.token.email));
+    }
+
+    // Busca usuário pelo uid (fallback para autenticações baseadas em uid)
+    function hasUserByUid() {
+      return isAuthenticated() && request.auth.uid != null &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    // Dados do documento do usuário
     function getUserData() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+      return hasUserByEmail()
+        ? get(/databases/$(database)/documents/usuarios/$(request.auth.token.email)).data
+        : (hasUserByUid() ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data : {});
     }
 
-    function userExists() {
-      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    // Role geral / CRM (admin, revisor, editor, cadastro, leitor)
+    function getRole() {
+      let data = getUserData();
+      return data.get('role', data.get('papel', 'none'));
     }
 
-    // Superadministrador (acesso irrestrito a todos os painéis)
-    function isAdminGeral() {
-      return isAuthenticated() && userExists() && (
-        getUserData().get('admin_geral', false) == true ||
-        getUserData().get('role', '') == 'admin' ||
-        getUserData().get('papel', '') == 'admin' ||
-        request.auth.token.get('admin', false) == true
-      );
+    // Superadministrador / Admin Geral
+    function isAdmin() {
+      let role = getRole();
+      let data = getUserData();
+      return role == 'admin' ||
+        data.get('admin_geral', false) == true ||
+        request.auth.token.get('admin', false) == true;
     }
 
-    // --- ROLES ESPECÍFICAS DE CADA PAINEL ---
-
-    // 1. Painel Projetos (DIST)
+    // Role específica do Painel de Projetos (DIST) com fallback para role do CRM
     function getRoleProjetos() {
-      return userExists() ? getUserData().get('role_projetos', null) : null;
+      let data = getUserData();
+      return data.get('role_projetos', getRole());
     }
+
+    // Permissões CRM / Governança
+    function canCreateCRM() {
+      let role = getRole();
+      return isAdmin() || role in ['admin', 'revisor', 'editor', 'cadastro'];
+    }
+
+    function canEditCRM() {
+      let role = getRole();
+      return isAdmin() || role in ['admin', 'revisor', 'editor'];
+    }
+
+    function canDeleteCRM() {
+      let role = getRole();
+      return isAdmin() || role in ['admin', 'revisor'];
+    }
+
+    // Permissões Painel de Projetos (DIST)
     function canReadProjetos() {
-      return isAdminGeral() || getRoleProjetos() in ['admin', 'editor', 'leitor'];
+      let rp = getRoleProjetos();
+      return isAdmin() || rp in ['admin', 'revisor', 'editor', 'cadastro', 'leitor'];
     }
+
     function canWriteProjetos() {
-      return isAdminGeral() || getRoleProjetos() in ['admin', 'editor'];
-    }
-    function isAdminProjetos() {
-      return isAdminGeral() || getRoleProjetos() == 'admin';
+      let rp = getRoleProjetos();
+      return isAdmin() || rp in ['admin', 'revisor', 'editor', 'cadastro'];
     }
 
-    // 2. Painel CRM / RSV (Contatos e Entidades)
-    // Mantém total retrocompatibilidade lendo 'role' (ou 'papel') se 'role_crm' não existir
-    function getRoleCRM() {
-      return userExists() 
-        ? getUserData().get('role_crm', getUserData().get('role', getUserData().get('papel', null))) 
-        : null;
-    }
-    function canReadCRM() {
-      return isAdminGeral() || getRoleCRM() in ['admin', 'revisor', 'editor', 'cadastro', 'leitor'];
-    }
-    function canWriteCRM() {
-      return isAdminGeral() || getRoleCRM() in ['admin', 'revisor', 'editor', 'cadastro'];
-    }
-
-    // 3. Painel Convites & Eventos
-    function getRoleEventos() {
-      return userExists() ? getUserData().get('role_eventos', null) : null;
-    }
-    function canReadEventos() {
-      return isAdminGeral() || getRoleEventos() in ['admin', 'editor', 'leitor'];
-    }
-    function canWriteEventos() {
-      return isAdminGeral() || getRoleEventos() in ['admin', 'editor'];
+    function canDeleteProjetos() {
+      let rp = getRoleProjetos();
+      return isAdmin() || rp in ['admin', 'revisor'];
     }
 
     // =========================================================================
@@ -74,86 +88,197 @@ service cloud.firestore {
     // =========================================================================
     match /usuarios/{userId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && (request.auth.uid == userId || isAdminGeral());
-      allow delete: if isAdminGeral();
+      allow write: if isAuthenticated() && (
+        isAdmin() || 
+        (request.auth.token.email != null && request.auth.token.email == userId) || 
+        request.auth.uid == userId
+      );
     }
 
     // =========================================================================
-    // MÓDULO 1: BASE CENTRAL CRM / RSV
+    // MÓDULO 1: BASE CENTRAL CRM / RSV (Master: painel-crm)
     // =========================================================================
-    match /contatos/{contatoId} {
-      allow read: if isAuthenticated() && canReadCRM();
-      allow create, update: if isAuthenticated() && canWriteCRM();
-      allow delete: if isAdminGeral() || getRoleCRM() in ['admin', 'revisor'];
+
+    // Contatos
+    match /contatos/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id_pessoa' in resource.data) || request.resource.data.id_pessoa == resource.data.id_pessoa
+      );
     }
 
-    match /entidades/{entidadeId} {
-      allow read: if isAuthenticated() && canReadCRM();
-      allow write: if isAuthenticated() && canWriteCRM();
+    // Entidades
+    match /entidades/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id_entidade' in resource.data) || request.resource.data.id_entidade == resource.data.id_entidade
+      );
     }
 
-    match /municipios/{municipioId} {
-      allow read: if isAuthenticated() && canReadCRM();
-      allow write: if isAdminGeral();
+    // Interações / Reuniões / Eventos
+    match /interacoes/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id_interacao' in resource.data) || request.resource.data.id_interacao == resource.data.id_interacao
+      );
     }
 
-    match /interacoes/{interacaoId} {
-      allow read: if isAuthenticated() && canReadCRM();
-      allow write: if isAuthenticated() && canWriteCRM();
+    // Registros / Presenças
+    match /registros/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id_registro' in resource.data) || request.resource.data.id_registro == resource.data.id_registro
+      );
     }
 
-    match /presencas/{presencaId} {
-      allow read: if isAuthenticated() && canReadCRM();
-      allow write: if isAuthenticated() && canWriteCRM();
+    match /presencas/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && canEditCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
     }
 
-    // =========================================================================
-    // MÓDULO 2: GESTÃO DE PROJETOS INTERINSTITUCIONAIS (DIST)
-    // =========================================================================
-    match /projetos/{projetoId} {
+    // Câmaras Temáticas
+    match /camara_tematica/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id_cam' in resource.data) || request.resource.data.id_cam == resource.data.id_cam
+      );
+    }
+
+    // Eixos RSV
+    match /eixos_psv/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id_eixo' in resource.data) || request.resource.data.id_eixo == resource.data.id_eixo
+      );
+    }
+
+    // Municípios
+    match /municipios/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('cod_ibge' in resource.data) || request.resource.data.cod_ibge == resource.data.cod_ibge
+      );
+    }
+
+    // Indicações das Câmaras Temáticas
+    match /indicacoes_camara/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id_indicacao' in resource.data) || request.resource.data.id_indicacao == resource.data.id_indicacao
+      );
+    }
+
+    // Comitê Gestor
+    match /comite_gestor/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id' in resource.data) || request.resource.data.id == resource.data.id
+      );
+    }
+
+    // Representação do Sistran
+    match /representacao_sistran/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && canCreateCRM();
+      allow delete: if isAuthenticated() && canDeleteCRM();
+      allow update: if isAuthenticated() && canEditCRM() && (
+        isAdmin() || !('id' in resource.data) || request.resource.data.id == resource.data.id
+      );
+    }
+
+    // Agrupamentos (Contact Groups)
+    match /agrupamentos/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        isAdmin() || request.auth.token.email == request.resource.data.email_usuario
+      );
+      allow update, delete: if isAuthenticated() && (
+        isAdmin() || request.auth.token.email == resource.data.email_usuario
+      );
+    }
+
+    // Histórico de Alterações do CRM (Audit Log)
+    match /historico_alteracao/{docId} {
       allow read: if isAuthenticated() && canReadProjetos();
-      allow create, update: if isAuthenticated() && canWriteProjetos();
-      allow delete: if isAdminProjetos();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
     }
 
-    match /riscos/{riscoId} {
+    // =========================================================================
+    // MÓDULO 2: GESTÃO DE PROJETOS E ACOMPANHAMENTO DIST (Master: painel-projetos)
+    // =========================================================================
+
+    // Projetos
+    match /projetos/{docId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow create: if isAuthenticated() && canWriteProjetos();
+      allow delete: if isAuthenticated() && canDeleteProjetos();
+      allow update: if isAuthenticated() && canWriteProjetos() && (
+        isAdmin() || !('id_projeto' in resource.data) || !('id_projeto' in request.resource.data) ||
+        request.resource.data.id_projeto == resource.data.id_projeto
+      );
+    }
+
+    // Diagnósticos DIST
+    match /diagnosticos/{docId} {
       allow read: if isAuthenticated() && canReadProjetos();
       allow write: if isAuthenticated() && canWriteProjetos();
     }
 
-    match /riscos_projeto/{riscoId} {
+    // Matriz de Riscos
+    match /riscos/{docId} {
       allow read: if isAuthenticated() && canReadProjetos();
       allow write: if isAuthenticated() && canWriteProjetos();
     }
 
-    match /diagnosticos/{diagnosticoId} {
+    match /riscos_projeto/{docId} {
       allow read: if isAuthenticated() && canReadProjetos();
       allow write: if isAuthenticated() && canWriteProjetos();
     }
 
-    match /historico/{logId} {
+    // Histórico / Auditoria do Painel de Projetos
+    match /historico/{docId} {
       allow read: if isAuthenticated() && canReadProjetos();
       allow create: if isAuthenticated() && canWriteProjetos();
       allow update, delete: if false; // Auditoria imutável
     }
 
-    match /audit_logs/{logId} {
+    match /audit_logs/{docId} {
       allow read: if isAuthenticated() && canReadProjetos();
       allow create: if isAuthenticated() && canWriteProjetos();
       allow update, delete: if false;
     }
 
     // =========================================================================
-    // MÓDULO 3: GESTÃO DE CONVITES & EVENTOS
+    // MÓDULO 3: GESTÃO DE CONVITES & EVENTOS (Futuro Módulo)
     // =========================================================================
-    match /convites/{conviteId} {
-      allow read: if isAuthenticated() && canReadEventos();
-      allow write: if isAuthenticated() && canWriteEventos();
+    match /convites/{docId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow write: if isAuthenticated() && canWriteProjetos();
     }
 
-    match /eventos/{eventoId} {
-      allow read: if isAuthenticated() && canReadEventos();
-      allow write: if isAuthenticated() && canWriteEventos();
+    match /eventos/{docId} {
+      allow read: if isAuthenticated() && canReadProjetos();
+      allow write: if isAuthenticated() && canWriteProjetos();
     }
 
     // =========================================================================

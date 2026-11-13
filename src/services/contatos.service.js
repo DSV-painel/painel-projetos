@@ -18,16 +18,18 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export function normalizarContato(c) {
   if (!c) return null;
+  const id = c.id || c.id_pessoa || '';
+  const id_pessoa = c.id_pessoa || id;
   const email = (c.email || c.email_institucional || c.Email || c.mail || '').trim().toLowerCase();
 
   // 1. Extração ampla de chaves possíveis da base CRM (/contatos)
   const candidatosNome = [
+    c.nome_completo,
+    c.nomeCompleto,
     c.nome,
     c.Nome,
     c.nome_contato,
     c.nomeContato,
-    c.nome_completo,
-    c.nomeCompleto,
     c.contato,
     c.Contato,
     c.name,
@@ -68,17 +70,24 @@ export function normalizarContato(c) {
   const cargo = c.cargo || c.Cargo || c.funcao || c.papel || '';
   const area = c.area || c.setor || c.Setor || c.entidade || c.orgao || c.lotacao || '';
   const telefone = c.telefone || c.celular || c.Telefone || c.ramal || '';
+  const id_entidade = c.id_entidade || (Array.isArray(c.vinculos) && c.vinculos[0] ? c.vinculos[0].id_entidade : '');
   const projetosIds = Array.isArray(c.projetosIds)
     ? c.projetosIds
     : (c.projetoId ? [c.projetoId] : []);
 
   return {
     ...c,
+    id,
+    id_pessoa,
     nome,
+    nome_completo: c.nome_completo || nome,
     email,
+    email_institucional: c.email_institucional || email,
     cargo,
     area,
     telefone,
+    id_entidade,
+    status: c.status || 'Ativo',
     projetoId: c.projetoId || (projetosIds.length > 0 ? projetosIds[0] : null),
     projetosIds
   };
@@ -193,6 +202,7 @@ export const ContatosService = {
   async listarTodos() {
     const contatos = await StorageAdapter.getAll(COLLECTION);
     return contatos
+      .filter(c => c && c.status !== 'Inativo')
       .map(normalizarContato)
       .filter(Boolean)
       .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
@@ -314,8 +324,14 @@ export const ContatosService = {
       throw new Error(`O e-mail "${email}" já está cadastrado para o contato "${duplicado.nome}" neste projeto.`);
     }
 
-    const isNovo = !dadosContato.id;
+    const isNovo = !dadosContato.id && !dadosContato.id_pessoa;
     const now = new Date().toISOString();
+    const idPessoa = dadosContato.id_pessoa || dadosContato.id || `PES-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const idEntidade = (dadosContato.id_entidade || (dadosContato.vinculos?.[0]?.id_entidade) || '').trim();
+    const cargo = (dadosContato.cargo || dadosContato.Cargo || dadosContato.funcao || '').trim();
+    const vinculos = Array.isArray(dadosContato.vinculos) && dadosContato.vinculos.length > 0
+      ? dadosContato.vinculos
+      : (idEntidade ? [{ id_entidade: idEntidade, cargo }] : []);
 
     const projetosIds = Array.isArray(dadosContato.projetosIds) && dadosContato.projetosIds.length > 0
       ? Array.from(new Set([...dadosContato.projetosIds, projId].filter(Boolean)))
@@ -323,11 +339,19 @@ export const ContatosService = {
 
     const payload = {
       ...dadosContato,
+      id: idPessoa,
+      id_pessoa: idPessoa,
       nome,
+      nome_completo: nome,
       email,
-      cargo: (dadosContato.cargo || dadosContato.Cargo || dadosContato.funcao || '').trim(),
+      email_institucional: email,
+      cargo,
       area: (dadosContato.area || dadosContato.setor || dadosContato.Setor || dadosContato.entidade || dadosContato.orgao || '').trim(),
       telefone: (dadosContato.telefone || dadosContato.celular || dadosContato.Telefone || '').trim(),
+      id_entidade: idEntidade,
+      vinculos,
+      tabela_origem: dadosContato.tabela_origem || 'Painel Projetos',
+      status: dadosContato.status || 'Ativo',
       projetoId: projId,
       projetosIds,
       atualizadoEm: now,

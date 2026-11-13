@@ -58,8 +58,9 @@ export const EntidadesService = {
       raw = (INITIAL_DATA && INITIAL_DATA.entidades) || [];
     }
 
-    // Normalização completa dos documentos do Firestore
+    // Normalização completa dos documentos do Firestore (filtrando arquivadas / inativas)
     const entidades = (raw || [])
+      .filter(e => e && e.status !== 'Inativo')
       .map(e => this.normalizarEntidade(e))
       .filter(e => e.nome && e.nome !== 'Entidade');
 
@@ -161,7 +162,8 @@ export const EntidadesService = {
       nome: nomeFormatado || sigla || 'Entidade',
       descricao_entidade: descricao,
       descricao: (descricao && descricao !== nomeFormatado) ? descricao : '',
-      tipo
+      tipo,
+      status: e.status || ''
     };
   },
 
@@ -235,5 +237,34 @@ export const EntidadesService = {
     }
 
     return resultados.sort((a, b) => b.score - a.score);
+  },
+
+  /**
+   * Cadastra uma nova entidade com status 'pendente' na base /entidades do Firestore
+   * seguindo o padrão canônico do painel-crm
+   * @param {{ nome: string, sigla?: string, descricao?: string }} dados
+   * @param {Object} [usuario]
+   * @returns {Promise<Object>}
+   */
+  async criarEntidadePendente({ nome, sigla = '', descricao = '' }, usuario) {
+    const nomeLimpo = (nome || '').trim();
+    if (!nomeLimpo) {
+      throw new Error('O nome da entidade ou ente externo é obrigatório.');
+    }
+    const siglaLimpa = (sigla || '').trim().toUpperCase();
+    const idEntidade = `P-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const payload = {
+      id: idEntidade,
+      id_entidade: idEntidade,
+      nome_entidade: nomeLimpo,
+      sigla_entidade: siglaLimpa,
+      descricao_entidade: (descricao || '').trim(),
+      status: 'pendente',
+      criadoEm: new Date().toISOString(),
+      criadoPor: usuario ? { uid: usuario.uid, nome: usuario.nome } : null
+    };
+
+    const salva = await StorageAdapter.save(COLLECTION, payload);
+    return this.normalizarEntidade(salva);
   }
 };

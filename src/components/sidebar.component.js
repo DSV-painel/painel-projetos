@@ -29,6 +29,8 @@ export function renderSidebar() {
 
     const nomeProjetoAtivo = activeProject ? (activeProject.nome || activeProject.nome_projeto || 'Projeto Ativo') : 'Nenhum Selecionado';
 
+    const isProjetoAtivoTab = ['projeto-ativo', 'info-gerais', 'visao-geral', 'diagnostico', 'matriz-riscos'].includes(activeTab);
+
     container.innerHTML = `
       <div class="sidebar-header">
         <a href="#dashboard" class="sidebar-brand" id="brand-link" aria-label="Detran-SP">
@@ -37,15 +39,15 @@ export function renderSidebar() {
             <img src="${logoDetran}" alt="Detran.SP" class="sidebar-logo-collapsed" />
           </div>
         </a>
-        <button type="button" class="btn-toggle-sidebar" id="btn-toggle-sidebar" aria-label="${sidebarCollapsed ? 'Expandir menu lateral' : 'Colapsar menu lateral'}">
-          <span class="material-symbols-outlined">${sidebarCollapsed ? 'chevron_right' : 'chevron_left'}</span>
+        <button type="button" class="btn-toggle-sidebar" id="sidebarCollapseBtn" aria-label="${sidebarCollapsed ? 'Expandir menu lateral' : 'Colapsar menu lateral'}">
+          <span class="material-icons">${sidebarCollapsed ? 'menu' : 'menu_open'}</span>
         </button>
       </div>
 
-      <!-- Seletor de Projeto Ativo Integrado na Sidebar -->
+      <!-- Seletor de Projeto Ativo Integrado na Sidebar (Superfície Clara DSV) -->
       <div class="sidebar-project-widget" title="${sidebarCollapsed ? 'Projeto: ' + nomeProjetoAtivo : ''}">
         <div class="sidebar-project-widget-label">
-          <span class="material-symbols-outlined">folder_open</span>
+          <span class="material-icons" style="font-size: 16px; color: #0f5cab;">folder</span>
           <span>Projeto Ativo</span>
         </div>
         <div class="sidebar-project-select-container">
@@ -53,70 +55,35 @@ export function renderSidebar() {
             <option value="">-- Selecionar Projeto --</option>
             ${projetos.map(p => `
               <option value="${p.id}" ${p.id === activeProjectId ? 'selected' : ''}>
-                ${p.nome || p.nome_projeto || 'Projeto sem nome'} ${p.distHabilitado ? '★' : ''}
+                ${p.sigla ? '[' + p.sigla + '] ' : ''}${p.nome || p.nome_projeto || 'Projeto sem nome'} ${p.distHabilitado ? '★' : ''}
               </option>
             `).join('')}
           </select>
         </div>
       </div>
 
-      <ul class="sidebar-nav" role="tablist">
-        <li class="nav-tab-item" role="presentation">
-          <button type="button" class="nav-tab-link ${activeTab === 'dashboard' ? 'active' : ''}" data-tab="dashboard" role="tab" aria-selected="${activeTab === 'dashboard'}">
-            <span class="material-symbols-outlined">dashboard</span>
-            <span class="nav-tab-label">Dashboard</span>
-          </button>
-        </li>
+      <nav class="sidebar-nav menu" role="tablist">
+        <button type="button" class="tab nav-tab-link ${activeTab === 'dashboard' ? 'active' : ''}" data-tab="dashboard" data-tooltip="Dashboard" role="tab" aria-selected="${activeTab === 'dashboard'}">
+          <span class="material-icons">dashboard</span>
+          <span class="tab-text nav-tab-label">Dashboard</span>
+        </button>
 
-        <li class="nav-tab-item" role="presentation">
-          <button type="button" class="nav-tab-link ${activeTab === 'info-gerais' ? 'active' : ''}" data-tab="info-gerais" role="tab" aria-selected="${activeTab === 'info-gerais'}">
-            <span class="material-symbols-outlined">description</span>
-            <span class="nav-tab-label">Informações Gerais</span>
-          </button>
-        </li>
+        <button type="button" class="tab nav-tab-link ${activeTab === 'projetos' ? 'active' : ''}" data-tab="projetos" data-tooltip="Projetos" role="tab" aria-selected="${activeTab === 'projetos'}">
+          <span class="material-icons">folder_open</span>
+          <span class="tab-text nav-tab-label">Projetos</span>
+        </button>
 
-        <li class="nav-section-title">Módulo DIST</li>
+        <button type="button" class="tab nav-tab-link ${isProjetoAtivoTab ? 'active' : ''}" data-tab="projeto-ativo" data-tooltip="Projeto Ativo" role="tab" aria-selected="${isProjetoAtivoTab}">
+          <span class="material-icons">assignment</span>
+          <span class="tab-text nav-tab-label">Projeto Ativo</span>
+          ${activeProject && !activeProject.distHabilitado ? '<span class="nav-tab-badge" title="Módulo DIST desabilitado">Geral</span>' : ''}
+        </button>
 
-        <li class="nav-tab-item" role="presentation">
-          <button type="button" class="nav-tab-link ${activeTab === 'visao-geral' ? 'active' : ''}" data-tab="visao-geral" role="tab" aria-selected="${activeTab === 'visao-geral'}">
-            <span class="material-symbols-outlined">visibility</span>
-            <span class="nav-tab-label">Visão Geral do Projeto</span>
-            ${activeProject && !activeProject.distHabilitado ? '<span class="nav-tab-badge" title="Módulo DIST desabilitado para este projeto">Inativo</span>' : ''}
-          </button>
-        </li>
-
-        <li class="nav-tab-item" role="presentation">
-          <button type="button" class="nav-tab-link ${activeTab === 'diagnostico' ? 'active' : ''}" data-tab="diagnostico" role="tab" aria-selected="${activeTab === 'diagnostico'}">
-            <span class="material-symbols-outlined">fact_check</span>
-            <span class="nav-tab-label">Diagnóstico DIST</span>
-            ${activeProject && !activeProject.distHabilitado ? '<span class="nav-tab-badge" title="Módulo DIST desabilitado para este projeto">Inativo</span>' : ''}
-          </button>
-        </li>
-
-        <li class="nav-tab-item" role="presentation">
-          <button type="button" class="nav-tab-link ${activeTab === 'matriz-riscos' ? 'active' : ''}" data-tab="matriz-riscos" role="tab" aria-selected="${activeTab === 'matriz-riscos'}">
-            <span class="material-symbols-outlined">grid_view</span>
-            <span class="nav-tab-label">Matriz de Riscos</span>
-            ${activeProject && !activeProject.distHabilitado ? '<span class="nav-tab-badge" title="Módulo DIST desabilitado para este projeto">Inativo</span>' : ''}
-          </button>
-        </li>
-
-        <li class="nav-section-title">Portfólio & Auditoria</li>
-
-        <li class="nav-tab-item" role="presentation">
-          <button type="button" class="nav-tab-link ${activeTab === 'projetos' ? 'active' : ''}" data-tab="projetos" role="tab" aria-selected="${activeTab === 'projetos'}">
-            <span class="material-symbols-outlined">folder_open</span>
-            <span class="nav-tab-label">Projetos</span>
-          </button>
-        </li>
-
-        <li class="nav-tab-item" role="presentation">
-          <button type="button" class="nav-tab-link ${activeTab === 'historico' ? 'active' : ''}" data-tab="historico" role="tab" aria-selected="${activeTab === 'historico'}">
-            <span class="material-symbols-outlined">history</span>
-            <span class="nav-tab-label">Histórico & Auditoria</span>
-          </button>
-        </li>
-      </ul>
+        <button type="button" class="tab nav-tab-link ${activeTab === 'historico' ? 'active' : ''}" data-tab="historico" data-tooltip="Histórico" role="tab" aria-selected="${activeTab === 'historico'}">
+          <span class="material-icons">history</span>
+          <span class="tab-text nav-tab-label">Histórico</span>
+        </button>
+      </nav>
 
       <div class="sidebar-footer">
         <div class="dist-module-pill ${distAtivo === true ? 'active' : 'inactive'}" title="${distAtivo === true ? 'Módulo DIST ativo no projeto selecionado' : 'Selecione um projeto com DIST ativo'}">
@@ -135,7 +102,7 @@ export function renderSidebar() {
               </div>
             </div>
             <button type="button" id="sidebarLogoutBtn" class="btn-sidebar-logout" title="Sair da Conta" aria-label="Sair da Conta">
-              <span class="material-symbols-outlined">logout</span>
+              <span class="material-icons">logout</span>
             </button>
           </div>
         ` : ''}
@@ -147,12 +114,21 @@ export function renderSidebar() {
       btn.addEventListener('click', () => {
         const targetTab = btn.getAttribute('data-tab');
         guardedNavigate(() => {
-          setActiveTab(targetTab);
+          if (targetTab === 'projeto-ativo') {
+            const currentProj = getState().activeProject;
+            if (currentProj && currentProj.distHabilitado) {
+              setActiveTab('visao-geral');
+            } else {
+              setActiveTab('info-gerais');
+            }
+          } else {
+            setActiveTab(targetTab);
+          }
         });
       });
     });
 
-    const toggleBtn = container.querySelector('#btn-toggle-sidebar');
+    const toggleBtn = container.querySelector('#sidebarCollapseBtn') || container.querySelector('#btn-toggle-sidebar');
     if (toggleBtn) {
       toggleBtn.addEventListener('click', () => {
         toggleSidebar();

@@ -6,10 +6,11 @@
 import { getState, canEdit } from '../store/state.js';
 import { RiscosService, calcularClassificacaoRisco } from '../services/riscos.service.js';
 import { ProjetosService } from '../services/projetos.service.js';
-import { openModal, closeModal } from '../components/modal.component.js';
+import { openModal, closeModal, confirmModal } from '../components/modal.component.js';
 import { showToast } from '../components/toast.component.js';
 import { getAreasRiscos } from '../config/areas-institucionais.js';
 import { renderProjectContextCard, attachProjectContextCardEvents } from '../components/project-context.component.js';
+import { exportarParaCSV } from '../utils/csv-export.util.js';
 
 export async function renderMatrizRiscos(container) {
   const { activeProject } = getState();
@@ -125,7 +126,12 @@ export async function renderMatrizRiscos(container) {
           <span class="material-symbols-outlined">format_list_numbered</span>
           <h3 class="card-title">Riscos Mapeados do Projeto</h3>
         </div>
-        <span class="tag" id="tag-total-riscos-proj">...</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="tag" id="tag-total-riscos-proj">...</span>
+          <button type="button" id="btn-download-riscos" class="icon-btn" title="Baixar Riscos em CSV">
+            <span class="material-icons">download</span>
+          </button>
+        </div>
       </div>
 
       <div class="table-responsive">
@@ -331,7 +337,14 @@ export async function renderMatrizRiscos(container) {
         const risco = riscos.find(x => x.id === id);
         if (!risco) return;
 
-        if (confirm(`Tem certeza que deseja remover o Risco #${risco.numero} (${risco.titulo})?`)) {
+        const confirmado = await confirmModal({
+          title: 'Remover Risco',
+          message: `Tem certeza que deseja remover o <strong>Risco #${risco.numero} (${risco.titulo})</strong>?`,
+          confirmText: 'Sim, Remover',
+          danger: true
+        });
+
+        if (confirmado) {
           const { currentUser } = getState();
           await RiscosService.excluirRisco(id, currentUser);
           showToast(`Risco #${risco.numero} excluído.`, 'info');
@@ -342,6 +355,32 @@ export async function renderMatrizRiscos(container) {
       });
     });
   };
+
+  container.querySelector('#btn-download-riscos')?.addEventListener('click', () => {
+    const dados = riscos.map(r => {
+      const { pontuacao, classificacao } = calcularClassificacaoRisco(r.probabilidade, r.impacto);
+      return {
+        numero: `#${r.numero}`,
+        titulo: r.titulo,
+        descricao: r.descricao,
+        areaResponsavel: r.areaResponsavel,
+        probabilidade: r.probabilidade,
+        impacto: r.impacto,
+        pontuacao,
+        classificacao
+      };
+    });
+    exportarParaCSV(dados, [
+      { key: 'numero', label: 'Nº' },
+      { key: 'titulo', label: 'Título' },
+      { key: 'areaResponsavel', label: 'Área Responsável' },
+      { key: 'probabilidade', label: 'Probabilidade (1 a 3)' },
+      { key: 'impacto', label: 'Impacto (1 a 3)' },
+      { key: 'pontuacao', label: 'Pontuação (P × I)' },
+      { key: 'classificacao', label: 'Classificação' },
+      { key: 'descricao', label: 'Descrição Detalhada' }
+    ], `riscos_${activeProject.sigla || activeProject.id}.csv`);
+  });
 
   // Modal para Visualizar Detalhes do Risco ao Clicar no Chip
   const abrirModalDetalhesRisco = (risco) => {

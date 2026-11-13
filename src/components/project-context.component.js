@@ -24,7 +24,9 @@ export function renderProjectContextCard(projeto, { showEditButton = true, extra
   const inicioHtml = `${inicioObj.texto}${inicioObj.isPrevisao && inicioObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; margin-left: 4px;" title="Período estimado">Previsão</span>' : ''}`;
   const fimHtml = `${fimObj.texto}${fimObj.isPrevisao && fimObj.texto !== '—' ? ' <span class="badge badge-neutral" style="font-size: 9.5px; padding: 1px 5px; margin-left: 4px;" title="Período estimado">Previsão</span>' : ''}`;
 
+  const { activeTab } = getState();
   const nomeProjeto = projeto.nome || projeto.nome_projeto || 'Projeto sem nome';
+  const siglaBadge = (projeto.sigla || projeto.sigla_projeto) ? `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700; margin-left: 8px;">${projeto.sigla || projeto.sigla_projeto}</span>` : '';
 
   return `
     <div class="project-context-card" id="project-context-banner">
@@ -37,7 +39,7 @@ export function renderProjectContextCard(projeto, { showEditButton = true, extra
           <div>
             <div class="project-context-pretitle">Projeto em Acompanhamento</div>
             <h1 class="project-context-title" title="${nomeProjeto}">
-              ${nomeProjeto}
+              ${nomeProjeto} ${siglaBadge}
             </h1>
           </div>
         </div>
@@ -116,6 +118,32 @@ export function renderProjectContextCard(projeto, { showEditButton = true, extra
           </div>
         </div>
       </div>
+
+      <!-- Barra de Sub-abas Horizontais do Projeto Ativo (Opção A) -->
+      <div class="project-subtabs-bar">
+        <button type="button" class="project-subtab-btn ${activeTab === 'info-gerais' ? 'active' : ''}" data-subtab="info-gerais">
+          <span class="material-symbols-outlined">description</span>
+          <span>Informações Gerais</span>
+        </button>
+
+        <button type="button" class="project-subtab-btn ${activeTab === 'visao-geral' ? 'active' : ''} ${!projeto.distHabilitado ? 'disabled' : ''}" data-subtab="visao-geral" ${!projeto.distHabilitado ? 'disabled title="Módulo DIST não habilitado"' : ''}>
+          <span class="material-symbols-outlined">visibility</span>
+          <span>Visão Geral & Articulação</span>
+          ${!projeto.distHabilitado ? '<span class="subtab-tag">Inativo</span>' : ''}
+        </button>
+
+        <button type="button" class="project-subtab-btn ${activeTab === 'diagnostico' ? 'active' : ''} ${!projeto.distHabilitado ? 'disabled' : ''}" data-subtab="diagnostico" ${!projeto.distHabilitado ? 'disabled title="Módulo DIST não habilitado"' : ''}>
+          <span class="material-symbols-outlined">fact_check</span>
+          <span>Diagnóstico DIST</span>
+          ${!projeto.distHabilitado ? '<span class="subtab-tag">Inativo</span>' : ''}
+        </button>
+
+        <button type="button" class="project-subtab-btn ${activeTab === 'matriz-riscos' ? 'active' : ''} ${!projeto.distHabilitado ? 'disabled' : ''}" data-subtab="matriz-riscos" ${!projeto.distHabilitado ? 'disabled title="Módulo DIST não habilitado"' : ''}>
+          <span class="material-symbols-outlined">grid_view</span>
+          <span>Matriz de Riscos 3x3</span>
+          ${!projeto.distHabilitado ? '<span class="subtab-tag">Inativo</span>' : ''}
+        </button>
+      </div>
     </div>
   `;
 }
@@ -132,4 +160,15 @@ export function attachProjectContextCardEvents(container) {
       });
     });
   }
+
+  container.querySelectorAll('.project-subtab-btn:not(.disabled)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const subtab = btn.getAttribute('data-subtab');
+      if (subtab) {
+        guardedNavigate(() => {
+          setActiveTab(subtab);
+        });
+      }
+    });
+  });
 }

@@ -4,11 +4,13 @@
  */
 import { ProjetosService, formatarDataOuPeriodo } from '../services/projetos.service.js';
 import { getState, setActiveProject, setActiveTab, canConfigureDist, canEdit, isAdmin } from '../store/state.js';
-import { openModal, closeModal } from '../components/modal.component.js';
+import { openModal, closeModal, confirmModal } from '../components/modal.component.js';
 import { showToast } from '../components/toast.component.js';
 import { getAreasInstitucionais } from '../config/areas-institucionais.js';
 import { guardedNavigate } from '../components/dirty-guard.js';
 import { renderMultiselectDropdown } from '../components/multiselect-dropdown.component.js';
+import { EntidadesService } from '../services/entidades.service.js';
+import { exportarParaCSV } from '../utils/csv-export.util.js';
 
 export async function renderProjetos(container) {
   const podeEditar = canEdit();
@@ -24,32 +26,32 @@ export async function renderProjetos(container) {
       <div style="display: flex; gap: 10px;">
         ${podeEditar ? `
           <button type="button" class="btn btn-primary" id="btn-abrir-novo-projeto">
-            <span class="material-symbols-outlined">add</span> Novo Projeto
+            <span class="material-icons">add</span> Novo Projeto
           </button>
         ` : ''}
       </div>
     </div>
 
-    <!-- Barra de Filtros e Busca -->
-    <div class="card" style="padding: 14px 18px; margin-bottom: 20px;">
-      <div style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
-        <div style="flex: 1; min-width: 240px; position: relative;">
-          <input type="text" id="filtro-busca-projeto" class="form-input" placeholder="Buscar por nome, entes ou objetivo..." style="padding-left: 36px;">
-          <span class="material-symbols-outlined" style="position: absolute; left: 10px; top: 11px; color: var(--text-muted); font-size: 18px;">search</span>
-        </div>
-
-        <div style="min-width: 180px;">
-          <select id="filtro-modulo-dist" class="form-select">
-            <option value="todos">Todos os Módulos DIST</option>
-            <option value="habilitado">Apenas DIST Habilitado</option>
-            <option value="desabilitado">Apenas DIST Desabilitado</option>
-          </select>
-        </div>
+    <!-- Barra de Ferramentas / Toolbar (Padrão CRM) -->
+    <div class="toolbar">
+      <div class="search-wrapper">
+        <span class="material-icons">search</span>
+        <input type="text" id="filtro-busca-projeto" class="search-input" placeholder="Pesquisar projetos..." autocomplete="off">
       </div>
+
+      <select id="filtro-modulo-dist" class="filter-select">
+        <option value="todos">Todos os Módulos DIST</option>
+        <option value="habilitado">DIST Habilitado</option>
+        <option value="desabilitado">DIST Desabilitado</option>
+      </select>
+
+      <button id="btn-download-projetos" class="icon-btn" title="Baixar Planilha CSV" style="margin-left: auto;">
+        <span class="material-icons">download</span>
+      </button>
     </div>
 
     <!-- Tabela de Projetos -->
-    <div class="table-responsive table-responsive-projetos">
+    <div class="table-container table-responsive">
       <table class="data-table" id="tabela-projetos">
         <thead>
           <tr>
@@ -194,7 +196,14 @@ export async function renderProjetos(container) {
         const proj = todosProjetos.find(p => p.id === id);
         if (!proj) return;
 
-        if (confirm(`Atenção: Deseja realmente remover o projeto "${proj.nome}"? Esta operação é restrita ao perfil Administrador.`)) {
+        const confirmado = await confirmModal({
+          title: 'Excluir Projeto',
+          message: `Atenção: Deseja realmente remover o projeto <strong>"${proj.nome}"</strong>? Esta operação é restrita ao perfil Administrador e não poderá ser desfeita.`,
+          confirmText: 'Sim, Excluir',
+          danger: true
+        });
+
+        if (confirmado) {
           try {
             const { currentUser, activeProjectId } = getState();
             await ProjetosService.excluirProjeto(id, currentUser);
@@ -221,6 +230,7 @@ export async function renderProjetos(container) {
     return todosProjetos.filter(p => {
       const matchTermo = !termo || 
         p.nome?.toLowerCase().includes(termo) ||
+        p.sigla?.toLowerCase().includes(termo) ||
         p.descricao?.toLowerCase().includes(termo) ||
         p.objetivo?.toLowerCase().includes(termo) ||
         (Array.isArray(p.entesExternos) && p.entesExternos.some(e => e.toLowerCase().includes(termo)));
@@ -233,7 +243,7 @@ export async function renderProjetos(container) {
     });
   };
 
-  // Listeners de Filtro
+  // Listeners de Filtro e Exportação CSV
   container.querySelector('#filtro-busca-projeto').addEventListener('input', () => {
     renderTabela(filtrarProjetos());
   });
@@ -242,7 +252,21 @@ export async function renderProjetos(container) {
     renderTabela(filtrarProjetos());
   });
 
-  // Modal de Detalhes Expandidos
+  container.querySelector('#btn-download-projetos')?.addEventListener('click', () => {
+    const dados = filtrarProjetos();
+    exportarParaCSV(dados, [
+      { key: 'sigla', label: 'Sigla' },
+      { key: 'nome', label: 'Nome do Projeto' },
+      { key: 'areaGestora', label: 'Área Gestora' },
+      { key: 'entesExternos', label: 'Entes Externos' },
+      { key: 'distHabilitado', label: 'Módulo DIST' },
+      { key: 'dataInicio', label: 'Data Início' },
+      { key: 'previsaoEncerramento', label: 'Previsão Encerramento' },
+      { key: 'descricao', label: 'Descrição' }
+    ], 'projetos_portfolio.csv');
+  });
+
+  // Modal de Detalhes Expandidos (Modo Leitura com opção de Edição)
   const abrirModalDetalhes = (proj) => {
     const areas = Array.isArray(proj.areasDetranEnvolvidas) && proj.areasDetranEnvolvidas.length > 0
       ? proj.areasDetranEnvolvidas.map(a => `<span class="tag" style="margin-right: 4px; margin-bottom: 4px;">${a}</span>`).join('')
@@ -261,9 +285,12 @@ export async function renderProjetos(container) {
     const content = `
       <div style="display: flex; flex-direction: column; gap: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color-light); padding-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-          <span class="badge ${proj.distHabilitado ? 'badge-success' : 'badge-neutral'}">
-            ${proj.distHabilitado ? 'Módulo DIST Habilitado' : 'Módulo DIST Desabilitado'}
-          </span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge ${proj.distHabilitado ? 'badge-success' : 'badge-neutral'}">
+              ${proj.distHabilitado ? 'Módulo DIST Habilitado' : 'Módulo DIST Desabilitado'}
+            </span>
+            ${proj.sigla ? `<span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700;">${proj.sigla}</span>` : ''}
+          </div>
           <span style="font-size: 12px; color: var(--text-muted);">Área Gestora: <strong>${proj.areaGestora || 'DSV'}</strong></span>
         </div>
 
@@ -302,8 +329,13 @@ export async function renderProjetos(container) {
 
     const footerHtml = `
       <button type="button" class="btn btn-secondary" id="btn-modal-detalhes-fechar">Fechar</button>
+      ${podeEditar ? `
+        <button type="button" class="btn btn-secondary" id="btn-modal-detalhes-editar">
+          <span class="material-icons" style="font-size: 16px;">edit</span> Editar
+        </button>
+      ` : ''}
       <button type="button" class="btn btn-primary" id="btn-modal-detalhes-ativar">
-        <span class="material-symbols-outlined">folder</span> Ativar e Navegar
+        <span class="material-icons" style="font-size: 16px;">folder</span> Acompanhar Projeto
       </button>
     `;
 
@@ -315,6 +347,15 @@ export async function renderProjetos(container) {
     });
 
     modal.querySelector('#btn-modal-detalhes-fechar').addEventListener('click', closeModal);
+
+    const btnEditar = modal.querySelector('#btn-modal-detalhes-editar');
+    if (btnEditar) {
+      btnEditar.addEventListener('click', () => {
+        closeModal();
+        abrirModalFormulario(proj);
+      });
+    }
+
     modal.querySelector('#btn-modal-detalhes-ativar').addEventListener('click', () => {
       closeModal();
       guardedNavigate(() => {
@@ -329,20 +370,38 @@ export async function renderProjetos(container) {
   };
 
   // Modal Formulário de Cadastro / Edição
-  const abrirModalFormulario = (projetoExistente = null) => {
+  const abrirModalFormulario = async (projetoExistente = null) => {
     const isEdicao = !!projetoExistente;
     const areasDisponiveis = getAreasInstitucionais();
     const podeAlterarDist = canConfigureDist();
+
+    // Carrega lista de entidades externas cadastradas no CRM
+    const entidadesLista = await EntidadesService.listarTodas();
+    const opcoesEntidades = entidadesLista.map(e => ({
+      value: e.sigla || e.nome,
+      label: e.nome
+    }));
 
     const selectedAreas = Array.isArray(projetoExistente?.areasDetranEnvolvidas)
       ? projetoExistente.areasDetranEnvolvidas
       : [];
 
+    const selectedEntes = Array.isArray(projetoExistente?.entesExternos)
+      ? projetoExistente.entesExternos
+      : (projetoExistente?.entesExternos ? [projetoExistente.entesExternos] : []);
+
     const content = `
       <form id="form-projeto" style="display: flex; flex-direction: column; gap: 16px;">
-        <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="form-nome">Nome do Projeto <span class="required">*</span></label>
-          <input type="text" id="form-nome" class="form-input" value="${projetoExistente?.nome || ''}" required placeholder="Ex: Modernização do Sistema X">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="form-nome">Nome do Projeto <span class="required">*</span></label>
+            <input type="text" id="form-nome" class="form-input" value="${projetoExistente?.nome || ''}" required placeholder="Ex: Modernização do Sistema X">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="form-sigla">Sigla / Tag</label>
+            <input type="text" id="form-sigla" class="form-input" value="${projetoExistente?.sigla || projetoExistente?.sigla_projeto || ''}" placeholder="Ex: SFE, CNH">
+          </div>
         </div>
 
         <div class="form-group" style="margin-bottom: 0;">
@@ -373,9 +432,8 @@ export async function renderProjetos(container) {
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="form-entes-externos">Entes Externos</label>
-            <input type="text" id="form-entes-externos" class="form-input" placeholder="Ex: CET, DER (separar por vírgula)"
-              value="${Array.isArray(projetoExistente?.entesExternos) ? projetoExistente.entesExternos.join(', ') : (projetoExistente?.entesExternos || '')}">
+            <label class="form-label">Entes Externos (Base CRM)</label>
+            <div id="form-modal-multiselect-entes"></div>
           </div>
         </div>
 
@@ -414,7 +472,7 @@ export async function renderProjetos(container) {
     const footerHtml = `
       <button type="button" class="btn btn-secondary" id="btn-cancelar-form">Cancelar</button>
       <button type="button" class="btn btn-primary" id="btn-salvar-form">
-        <span class="material-symbols-outlined">save</span> ${isEdicao ? 'Salvar Alterações' : 'Cadastrar Projeto'}
+        <span class="material-icons" style="font-size: 16px;">save</span> ${isEdicao ? 'Salvar Alterações' : 'Cadastrar Projeto'}
       </button>
     `;
 
@@ -432,8 +490,20 @@ export async function renderProjetos(container) {
         id: 'modal-areas-multiselect',
         options: areasDisponiveis,
         selectedValues: selectedAreas,
-        placeholder: 'Selecione as áreas Detran envolvidas...',
+        placeholder: 'Selecione as áreas Detran...',
         searchPlaceholder: 'Buscar diretoria ou divisão...'
+      }
+    );
+
+    // Dropdown Multiselect de Entes Externos (Base CRM)
+    const multiselectEntes = renderMultiselectDropdown(
+      modal.querySelector('#form-modal-multiselect-entes'),
+      {
+        id: 'modal-entes-multiselect',
+        options: opcoesEntidades,
+        selectedValues: selectedEntes,
+        placeholder: 'Selecione entes externos...',
+        searchPlaceholder: 'Buscar órgão / ente...'
       }
     );
 
@@ -446,6 +516,7 @@ export async function renderProjetos(container) {
         return;
       }
 
+      const sigla = modal.querySelector('#form-sigla').value.trim();
       const areaGestora = modal.querySelector('#form-area-gestora').value;
       const descricao = modal.querySelector('#form-descricao').value.trim();
       const dataInicio = modal.querySelector('#form-data-inicio').value.trim();
@@ -458,9 +529,7 @@ export async function renderProjetos(container) {
         return;
       }
 
-      const entesRaw = modal.querySelector('#form-entes-externos').value;
-      const entesExternos = entesRaw ? entesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-
+      const entesExternos = multiselectEntes ? multiselectEntes.getSelected() : selectedEntes;
       const areasDetranEnvolvidas = multiselectAreas ? multiselectAreas.getSelected() : [];
 
       const objetivo = modal.querySelector('#form-objetivo').value.trim();
@@ -475,6 +544,8 @@ export async function renderProjetos(container) {
         const payload = {
           ...(projetoExistente || {}),
           nome,
+          sigla,
+          sigla_projeto: sigla,
           descricao,
           areaGestora,
           dataInicio,

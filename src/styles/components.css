@@ -1640,4 +1640,98 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
+/* ==========================================================================
+   Toolbar Padronizada DSV / Estilo CRM (Pílula e Download)
+   ========================================================================== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-wrapper .material-icons,
+.search-wrapper .material-symbols-outlined {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  font-size: 20px;
+  pointer-events: none;
+}
+
+.search-input {
+  padding: 10px 16px 10px 42px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 20px;
+  outline: none;
+  font-size: 13.5px;
+  width: 280px;
+  background-color: #f8fafc;
+  color: #1e293b;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--color-primary, #0f5cab);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(15, 92, 171, 0.1);
+}
+
+.filter-select {
+  padding: 9px 16px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 20px;
+  background-color: #f8fafc;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-select:focus {
+  border-color: #0f5cab;
+  background-color: #ffffff;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 20px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f5cab;
+  border-color: #0f5cab;
+}
+
+.icon-btn .material-icons,
+.icon-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+
 

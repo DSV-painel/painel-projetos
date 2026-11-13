@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { ContatosService, normalizarContato } from '../src/services/contatos.service.js';
-import { ProjetosService, formatarDataOuPeriodo } from '../src/services/projetos.service.js';
+import { ProjetosService, formatarDataOuPeriodo, normalizarProjeto } from '../src/services/projetos.service.js';
 import { DiagnosticosService, LABELS_CLASSIFICACAO_DIAGNOSTICO } from '../src/services/diagnosticos.service.js';
 import { RiscosService } from '../src/services/riscos.service.js';
+import { EntidadesService } from '../src/services/entidades.service.js';
+import { InteracoesService, normalizarInteracao } from '../src/services/interacoes.service.js';
 import { getAreasRiscos, getAreasInstitucionais } from '../src/config/areas-institucionais.js';
 import { isAdmin, setCurrentUser } from '../src/store/state.js';
 
@@ -250,5 +252,87 @@ describe('Áreas Institucionais e Permissões de Perfil RBAC', () => {
 
     setCurrentUser({ uid: 'u_gestor', nome: 'Gestor', perfil: 'gestor_dist' });
     expect(isAdmin()).toBe(false);
+  });
+});
+
+describe('Integração de Schemas e Interoperabilidade com o painel-crm', () => {
+  it('deve normalizar projeto garantindo id_projeto, sigla_projeto e nome_projeto', () => {
+    const raw = {
+      id: 'proj_crm_01',
+      nome_projeto: 'Rede de Radares Inteligentes',
+      sigla_projeto: 'RRI',
+      descricao_projeto: 'Integração de radares'
+    };
+
+    const norm = normalizarProjeto(raw);
+    expect(norm.id).toBe('proj_crm_01');
+    expect(norm.id_projeto).toBe('proj_crm_01');
+    expect(norm.nome).toBe('Rede de Radares Inteligentes');
+    expect(norm.nome_projeto).toBe('Rede de Radares Inteligentes');
+    expect(norm.sigla).toBe('RRI');
+    expect(norm.sigla_projeto).toBe('RRI');
+    expect(norm.distHabilitado).toBe(true);
+  });
+
+  it('deve salvar projeto persistindo id_projeto e sigla para compatibilidade com o catálogo do CRM', async () => {
+    const salvo = await ProjetosService.salvarProjeto({
+      nome: 'Fiscalização Integrada RSV',
+      sigla: 'FIR',
+      descricao: 'Projeto piloto com municípios',
+      areaGestora: 'DIST - Divisão de Integração Setorial'
+    }, { uid: 'u_test', nome: 'Tester' });
+
+    expect(salvo.id_projeto).toBe(salvo.id);
+    expect(salvo.sigla_projeto).toBe('FIR');
+    expect(salvo.nome_projeto).toBe('Fiscalização Integrada RSV');
+  });
+
+  it('deve cadastrar contato compatível com o schema PES-... do CRM', async () => {
+    const contatoSalvo = await ContatosService.salvarContato({
+      projetoId: 'proj_01',
+      nome: 'Engenheiro Carlos Silva',
+      email: 'carlos.engenharia@cetsp.com.br',
+      cargo: 'Engenheiro de Tráfego',
+      area: 'CET',
+      id_entidade: 'P-0001'
+    }, { uid: 'u_test', nome: 'Tester' });
+
+    expect(contatoSalvo.id_pessoa).toBeDefined();
+    expect(contatoSalvo.id_pessoa.startsWith('PES-')).toBe(true);
+    expect(contatoSalvo.nome_completo).toBe('Engenheiro Carlos Silva');
+    expect(contatoSalvo.email_institucional).toBe('carlos.engenharia@cetsp.com.br');
+    expect(contatoSalvo.tabela_origem).toBe('Painel Projetos');
+    expect(contatoSalvo.status).toBe('Ativo');
+  });
+
+  it('deve criar nova entidade com status pendente seguindo o padrão canônico do CRM', async () => {
+    const entidade = await EntidadesService.criarEntidadePendente({
+      nome: 'Consórcio Intermunicipal Grande ABC',
+      sigla: 'ABC',
+      descricao: 'Articulação regional viária'
+    }, { uid: 'u_test', nome: 'Tester' });
+
+    expect(entidade.id_entidade).toBeDefined();
+    expect(entidade.id_entidade.startsWith('P-')).toBe(true);
+    expect(entidade.status).toBe('pendente');
+    expect(entidade.sigla).toBe('ABC');
+  });
+
+  it('deve normalizar e filtrar interações vinculadas a um projeto', async () => {
+    const rawInteracao = {
+      id_interacao: 'INT-001',
+      nome_interacao: 'Reunião de Alinhamento CET e DER',
+      data_interacao: '2026-04-10',
+      hora_interacao: '14:30',
+      numero_sei: 'SEI-29.0001.002345/2026-11',
+      tags: ['SFE', 'Fiscalização'],
+      projetosIds: ['proj_01']
+    };
+
+    const norm = normalizarInteracao(rawInteracao);
+    expect(norm.id).toBe('INT-001');
+    expect(norm.nome).toBe('Reunião de Alinhamento CET e DER');
+    expect(norm.numero_sei).toBe('SEI-29.0001.002345/2026-11');
+    expect(norm.projetosIds).toContain('proj_01');
   });
 });

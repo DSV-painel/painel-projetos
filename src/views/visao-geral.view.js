@@ -9,12 +9,13 @@ import { getState, setActiveProject, setDirty, canEdit } from '../store/state.js
 import { ProjetosService } from '../services/projetos.service.js';
 import { ContatosService } from '../services/contatos.service.js';
 import { showToast } from '../components/toast.component.js';
-import { openModal, closeModal } from '../components/modal.component.js';
+import { openModal, closeModal, confirmModal } from '../components/modal.component.js';
 import { getAreasInstitucionais } from '../config/areas-institucionais.js';
 import { renderProjectContextCard, attachProjectContextCardEvents } from '../components/project-context.component.js';
 import { renderMultiselectDropdown } from '../components/multiselect-dropdown.component.js';
 import { buscarEntidadesFuzzy } from '../utils/fuzzy-match.util.js';
 import { EntidadesService } from '../services/entidades.service.js';
+import { InteracoesService } from '../services/interacoes.service.js';
 
 export async function renderVisaoGeral(container) {
   const { activeProject } = getState();
@@ -49,13 +50,22 @@ export async function renderVisaoGeral(container) {
     return;
   }
 
-  // Carrega dados atualizados do projeto e contatos
-  const projeto = await ProjetosService.obterPorId(activeProject.id) || activeProject;
-  const contatos = await ContatosService.listarPorProjeto(projeto.id);
+  // Carrega dados atualizados do projeto, contatos, entidades e reuniões do CRM
+  const [projeto, contatos, todasEntidades, interacoes] = await Promise.all([
+    ProjetosService.obterPorId(activeProject.id) || activeProject,
+    ContatosService.listarPorProjeto(activeProject.id),
+    EntidadesService.listarTodas(),
+    InteracoesService.listarPorProjeto(
+      activeProject.id,
+      activeProject.sigla || activeProject.sigla_projeto,
+      activeProject.nome || activeProject.nome_projeto
+    )
+  ]);
   const areasInstitucionais = getAreasInstitucionais();
 
-  // Estado local das áreas selecionadas
+  // Estado local das seleções
   let selectedAreasList = Array.isArray(projeto.areasDetranEnvolvidas) ? [...projeto.areasDetranEnvolvidas] : [];
+  let selectedEntesList = Array.isArray(projeto.entesExternos) ? [...projeto.entesExternos] : (projeto.entesExternos ? [projeto.entesExternos] : []);
 
   container.innerHTML = `
     <!-- Card Unificado de Contexto do Projeto Ativo -->
@@ -78,12 +88,19 @@ export async function renderVisaoGeral(container) {
       <form id="form-visao-geral">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;">
           
-          <!-- Coluna 1: Nome, Objetivo e Escopo -->
+          <!-- Coluna 1: Nome, Sigla, Objetivo e Escopo -->
           <div style="display: flex; flex-direction: column; gap: 18px;">
-            <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label" for="vg-nome">Nome do Projeto <span class="required">*</span></label>
-              <input type="text" id="vg-nome" class="form-input" value="${projeto.nome || projeto.nome_projeto || ''}" required placeholder="Nome oficial do projeto" ${!podeEditar ? 'disabled' : ''}>
-              <span class="form-error-msg" id="err-vg-nome" style="display: none;"></span>
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="vg-nome">Nome do Projeto <span class="required">*</span></label>
+                <input type="text" id="vg-nome" class="form-input" value="${projeto.nome || projeto.nome_projeto || ''}" required placeholder="Nome oficial do projeto" ${!podeEditar ? 'disabled' : ''}>
+                <span class="form-error-msg" id="err-vg-nome" style="display: none;"></span>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="vg-sigla">Sigla / Tag</label>
+                <input type="text" id="vg-sigla" class="form-input" value="${projeto.sigla || projeto.sigla_projeto || ''}" placeholder="Ex: SFE, CNH" ${!podeEditar ? 'disabled' : ''}>
+              </div>
             </div>
 
             <div class="form-group" style="margin-bottom: 0;">
@@ -117,10 +134,8 @@ export async function renderVisaoGeral(container) {
             </div>
 
             <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label" for="vg-entes">Entes Externos Envolvidos</label>
-              <input type="text" id="vg-entes" class="form-input" 
-                value="${Array.isArray(projeto.entesExternos) ? projeto.entesExternos.join(', ') : (projeto.entesExternos || '')}" 
-                placeholder="Ex: CET, DER, Polícia Rodoviária (separar por vírgula)" ${!podeEditar ? 'disabled' : ''}>
+              <label class="form-label">Entes Externos (Base CRM)</label>
+              <div id="vg-multiselect-entes-container"></div>
               <span class="form-hint">Órgãos públicos parceiros externos ao Detran.</span>
             </div>
 
@@ -137,7 +152,7 @@ export async function renderVisaoGeral(container) {
     </div>
 
     <!-- BLOCO 2: Pontos Focais e Contatos -->
-    <div class="card">
+    <div class="card" style="margin-bottom: 24px;">
       <div class="card-header">
         <div class="card-title-group">
           <span class="material-symbols-outlined">contact_phone</span>
@@ -154,12 +169,31 @@ export async function renderVisaoGeral(container) {
         <!-- Renderizado dinamicamente em contact-cards -->
       </div>
     </div>
+
+    <!-- BLOCO 3: Reuniões e Processos SEI Vinculados (Base CRM /interacoes) -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="material-icons" style="color: #0f5cab;">event_available</span>
+          <h3 class="card-title">Reuniões e Processos SEI Vinculados (Base CRM)</h3>
+        </div>
+        ${podeEditar ? `
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-vincular-interacao">
+            <span class="material-icons" style="font-size: 16px;">add_link</span> Vincular Reunião do CRM
+          </button>
+        ` : ''}
+      </div>
+
+      <div id="interacoes-container">
+        <!-- Tabela ou lista de reuniões/processos SEI vinculados -->
+      </div>
+    </div>
   `;
 
   // Conecta eventos do Card de Contexto
   attachProjectContextCardEvents(container);
 
-  // Inicializa o Dropdown Multiselect de Áreas
+  // Inicializa o Dropdown Multiselect de Áreas Detran
   renderMultiselectDropdown(
     container.querySelector('#vg-multiselect-areas-container'),
     {
@@ -171,6 +205,28 @@ export async function renderVisaoGeral(container) {
       disabled: !podeEditar,
       onChange: (novasAreas) => {
         selectedAreasList = novasAreas;
+        setDirty(true);
+      }
+    }
+  );
+
+  // Inicializa o Dropdown Multiselect de Entes Externos (Base CRM /entidades)
+  const opcoesEntidades = todasEntidades.map(e => ({
+    value: e.sigla || e.nome,
+    label: e.nome
+  }));
+
+  renderMultiselectDropdown(
+    container.querySelector('#vg-multiselect-entes-container'),
+    {
+      id: 'vg-entes-multiselect',
+      options: opcoesEntidades,
+      selectedValues: selectedEntesList,
+      placeholder: 'Selecione os entes externos...',
+      searchPlaceholder: 'Buscar órgão / ente...',
+      disabled: !podeEditar,
+      onChange: (novosEntes) => {
+        selectedEntesList = novosEntes;
         setDirty(true);
       }
     }
@@ -262,10 +318,17 @@ export async function renderVisaoGeral(container) {
         const c = lista.find(x => x.id === id);
         if (!c) return;
 
-        if (confirm(`Deseja remover o vínculo do contato "${c.nome}" com este projeto?`)) {
+        const confirmado = await confirmModal({
+          title: 'Remover Vínculo de Contato',
+          message: `Deseja remover o vínculo do contato <strong>"${c.nome}"</strong> com este projeto? O contato continuará disponível na base geral do CRM.`,
+          confirmText: 'Remover Vínculo',
+          danger: true
+        });
+
+        if (confirmado) {
           const { currentUser } = getState();
           await ContatosService.excluirContato(id, currentUser, projeto.id);
-          showToast(`Contato "${c.nome}" removido deste projeto.`, 'info');
+          showToast(`Contato "${c.nome}" desvinculado deste projeto.`, 'info');
           const atualizados = await ContatosService.listarPorProjeto(projeto.id);
           renderContatos(atualizados);
         }
@@ -274,6 +337,170 @@ export async function renderVisaoGeral(container) {
   };
 
   renderContatos(contatos);
+
+  // Renderiza tabela de reuniões e processos SEI vinculados
+  const renderInteracoes = (lista) => {
+    const interacoesDiv = container.querySelector('#interacoes-container');
+    if (!interacoesDiv) return;
+
+    if (lista.length === 0) {
+      interacoesDiv.innerHTML = `
+        <div style="text-align: center; padding: 32px 16px; background: var(--bg-hover, #f8fafc); border-radius: var(--radius-card, 8px); border: 1px dashed var(--border-color, #cbd5e1);">
+          <span class="material-icons" style="font-size: 36px; color: var(--text-muted); margin-bottom: 6px;">event_busy</span>
+          <div style="font-weight: 600; color: var(--text-main); font-size: 14px;">Nenhuma reunião ou interação vinculada</div>
+          <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">Utilize o botão "Vincular Reunião do CRM" para conectar reuniões, atas ou processos SEI da Rede de Segurança Viária a este projeto.</p>
+        </div>
+      `;
+      return;
+    }
+
+    interacoesDiv.innerHTML = `
+      <div class="table-responsive" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <table class="data-table" style="margin-bottom: 0;">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Nome / Assunto da Interação</th>
+              <th>Processo SEI</th>
+              <th>Encaminhamentos / Resumo</th>
+              <th style="text-align: center;">Documento</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lista.map(i => {
+              const dataFormatada = i.data_interacao
+                ? (i.data_interacao.includes('-') ? i.data_interacao.split('-').reverse().join('/') : i.data_interacao)
+                : '—';
+              return `
+                <tr>
+                  <td style="white-space: nowrap; font-weight: 600; color: var(--text-main);">
+                    ${dataFormatada} ${i.hora_interacao ? `<br><span style="font-size: 11px; color: var(--text-muted);">${i.hora_interacao}</span>` : ''}
+                  </td>
+                  <td>
+                    <div style="font-weight: 600; color: #0f5cab;">${i.nome_interacao || i.nome || 'Interação'}</div>
+                    ${i.tipo_interacao ? `<span class="badge" style="font-size: 10px; background: #e0f2fe; color: #0369a1;">${i.tipo_interacao}</span>` : ''}
+                  </td>
+                  <td>
+                    ${i.numero_sei ? `<span class="badge" style="background: #f1f5f9; color: #334155; font-family: monospace;">${i.numero_sei}</span>` : '<span style="color: var(--text-muted);">—</span>'}
+                  </td>
+                  <td style="font-size: 12.5px; color: var(--text-secondary); max-width: 320px;">
+                    ${i.encaminhamento_interacao || i.encaminhamento || '<span style="color: var(--text-muted);">Sem encaminhamentos registrados</span>'}
+                  </td>
+                  <td style="text-align: center;">
+                    ${i.link_documento ? `
+                      <a href="${i.link_documento}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="Abrir link do documento" style="text-decoration: none; padding: 4px 8px;">
+                        <span class="material-icons" style="font-size: 14px;">open_in_new</span> Ata/SEI
+                      </a>
+                    ` : '<span style="color: var(--text-muted);">—</span>'}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  };
+
+  renderInteracoes(interacoes);
+
+  // Modal Vincular Reunião / Interação do CRM
+  const abrirModalVincularInteracao = async () => {
+    const todasInteracoes = await InteracoesService.listarTodas();
+    const idsJaVinculadas = new Set(interacoes.map(i => i.id));
+
+    const content = `
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">
+          Selecione uma reunião ou interação registrada no <strong>painel-crm</strong> para associá-la a este projeto:
+        </p>
+
+        <div class="search-wrapper">
+          <span class="material-icons">search</span>
+          <input type="text" id="modal-search-interacao" class="search-input" placeholder="Buscar por assunto, data ou SEI..." style="width: 100%;">
+        </div>
+
+        <div id="modal-lista-interacoes" style="max-height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <!-- Itens preenchidos via JS -->
+        </div>
+
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 12px; color: var(--text-muted);">
+          Reuniões registradas na Rede de Segurança Viária no CRM aparecem automaticamente para associação ao projeto.
+        </div>
+      </div>
+    `;
+
+    const modal = openModal({
+      title: 'Vincular Reunião / Interação do CRM',
+      content,
+      footerHtml: '<button type="button" class="btn btn-secondary" id="btn-modal-fechar-interacao">Fechar</button>',
+      maxWidth: '640px'
+    });
+
+    modal.querySelector('#btn-modal-fechar-interacao').addEventListener('click', closeModal);
+
+    const renderListaModal = (termo = '') => {
+      const listaDiv = modal.querySelector('#modal-lista-interacoes');
+      const norm = termo.toLowerCase().trim();
+      const filtradas = todasInteracoes.filter(i => {
+        if (!norm) return true;
+        return (i.nome_interacao || '').toLowerCase().includes(norm) ||
+               (i.numero_sei || '').toLowerCase().includes(norm) ||
+               (i.data_interacao || '').includes(norm);
+      });
+
+      if (filtradas.length === 0) {
+        listaDiv.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px;">Nenhuma interação encontrada.</div>`;
+        return;
+      }
+
+      listaDiv.innerHTML = filtradas.map(i => {
+        const jaVinculada = idsJaVinculadas.has(i.id);
+        const dataFmt = i.data_interacao ? (i.data_interacao.includes('-') ? i.data_interacao.split('-').reverse().join('/') : i.data_interacao) : '';
+        return `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #f1f5f9; gap: 12px;">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">${i.nome_interacao || 'Interação'}</div>
+              <div style="display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: #64748b; margin-top: 2px;">
+                <span>${dataFmt}</span>
+                ${i.numero_sei ? `<span>• SEI: <code>${i.numero_sei}</code></span>` : ''}
+              </div>
+            </div>
+            <div>
+              ${jaVinculada ? `
+                <span class="badge badge-success" style="font-size: 11px;">Vinculada</span>
+              ` : `
+                <button type="button" class="btn btn-secondary btn-sm btn-acao-vincular" data-id="${i.id}">
+                  Vincular
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      listaDiv.querySelectorAll('.btn-acao-vincular').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const idInteracao = btn.getAttribute('data-id');
+          btn.disabled = true;
+          btn.textContent = 'Vinculando...';
+          const { currentUser } = getState();
+          await InteracoesService.vincularAoProjeto(idInteracao, projeto.id, currentUser);
+          closeModal();
+          showToast('Reunião vinculada com sucesso ao projeto!', 'success');
+          renderVisaoGeral(container);
+        });
+      });
+    };
+
+    renderListaModal();
+
+    modal.querySelector('#modal-search-interacao')?.addEventListener('input', (e) => {
+      renderListaModal(e.target.value);
+    });
+  };
+
+  container.querySelector('#btn-vincular-interacao')?.addEventListener('click', abrirModalVincularInteracao);
 
   // Dirty State Guard nos inputs do projeto e limpeza de erros inline
   const formProjeto = container.querySelector('#form-visao-geral');
@@ -306,6 +533,7 @@ export async function renderVisaoGeral(container) {
         return;
       }
 
+      const sigla = container.querySelector('#vg-sigla')?.value.trim() || '';
       const dataInicio = container.querySelector('#vg-inicio').value.trim();
       const previsaoEncerramento = inputFim.value.trim();
 
@@ -321,8 +549,7 @@ export async function renderVisaoGeral(container) {
         return;
       }
 
-      const entesRaw = container.querySelector('#vg-entes').value;
-      const entesExternos = entesRaw ? entesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const entesExternos = selectedEntesList;
       const areasDetranEnvolvidas = selectedAreasList;
       const objetivo = container.querySelector('#vg-objetivo').value.trim();
       const escopo = container.querySelector('#vg-escopo').value.trim();
@@ -336,6 +563,8 @@ export async function renderVisaoGeral(container) {
           ...projeto,
           nome,
           nome_projeto: nome,
+          sigla,
+          sigla_projeto: sigla,
           objetivo,
           escopo,
           dataInicio,
